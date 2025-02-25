@@ -6,12 +6,7 @@ import { getStorage } from "firebase/storage";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyDVZBoYmoCLUS7C20EYrmxfGJpw5Lm-PGs",
-  authDomain: "movie-app-36324.firebaseapp.com",
-  projectId: "movie-app-36324",
-  storageBucket: "movie-app-36324.firebasestorage.app",
-  messagingSenderId: "86056384497",
-  appId: "1:86056384497:web:56acf189964eb0a1777650"
+
 };
 
 // Initialize Firebase

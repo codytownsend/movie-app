@@ -1,7 +1,7 @@
 // This file will contain utility functions for interacting with The Movie Database (TMDB) API
 // You'll need to replace 'YOUR_API_KEY' with your actual TMDB API key
 
-const TMDB_API_KEY = 'YOUR_TMDB_API_KEY';
+const TMDB_API_KEY = '566cd2db71935d6f0167001d17187f9c';
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 
 // Fetch popular movies
