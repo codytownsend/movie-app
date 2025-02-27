@@ -1,187 +1,375 @@
-import { useState, useEffect } from 'react';
+// pages/discover.js
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
 import { useAuth } from '../contexts/AuthContext';
-import MovieCard from '../components/MovieCard';
-import { FaSearch, FaFilter, FaTimes, FaSortAmountDown } from 'react-icons/fa';
-import { getAllMovies, filterMovies } from '../utils/movieService';
+import EnhancedMovieCard from '../components/EnhancedMovieCard';
+import RevampedRecommendation from '../components/RecommendationSwiper';
+import { 
+  FaSearch, 
+  FaFilter, 
+  FaTimes, 
+  FaSortAmountDown, 
+  FaCircleNotch,
+  FaFire,
+  FaStar,
+  FaCalendarAlt
+} from 'react-icons/fa';
+import MoodSelector from '../components/MoodSelector';
+import tmdbApi from '../utils/tmdb';
 
-export default function Discover() {
-  const { currentUser } = useAuth();
+const DiscoverPage = () => {
+  const { currentUser, userProfile } = useAuth();
   const router = useRouter();
   const [movies, setMovies] = useState([]);
   const [filteredMovies, setFilteredMovies] = useState([]);
+  const [recommendedMovies, setRecommendedMovies] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showRecommendationSwiper, setShowRecommendationSwiper] = useState(true);
+  const [likedMovies, setLikedMovies] = useState([]);
+  const [dislikedMovies, setDislikedMovies] = useState([]);
+  const [totalResults, setTotalResults] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   
   // Filter states
   const [selectedGenres, setSelectedGenres] = useState([]);
-  const [selectedDecades, setSelectedDecades] = useState([]);
+  const [selectedDecade, setSelectedDecade] = useState('');
+  const [selectedMood, setSelectedMood] = useState('');
   const [selectedRating, setSelectedRating] = useState('');
-  const [sortBy, setSortBy] = useState('popularity');
+  const [sortBy, setSortBy] = useState('popularity.desc');
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'swiper'
   
-  const genres = ['Action', 'Adventure', 'Animation', 'Comedy', 'Crime', 'Documentary', 'Drama', 'Family', 'Fantasy', 'Horror', 'Thriller', 'Science Fiction'];
-  const decades = ['2020s', '2010s', '2000s', '1990s', '1980s', 'Older'];
-  const ratings = ['9+', '8+', '7+', '6+', 'Any'];
-  const sortOptions = [
-    { value: 'popularity', label: 'Popularity' },
-    { value: 'rating', label: 'Rating (High to Low)' },
-    { value: 'release_date', label: 'Release Date (Newest)' },
-    { value: 'title_asc', label: 'Title (A-Z)' },
+  const genres = [
+    { id: 28, name: 'Action' },
+    { id: 12, name: 'Adventure' },
+    { id: 16, name: 'Animation' },
+    { id: 35, name: 'Comedy' },
+    { id: 80, name: 'Crime' },
+    { id: 99, name: 'Documentary' },
+    { id: 18, name: 'Drama' },
+    { id: 10751, name: 'Family' },
+    { id: 14, name: 'Fantasy' },
+    { id: 36, name: 'History' },
+    { id: 27, name: 'Horror' },
+    { id: 10402, name: 'Music' },
+    { id: 9648, name: 'Mystery' },
+    { id: 10749, name: 'Romance' },
+    { id: 878, name: 'Science Fiction' },
+    { id: 10770, name: 'TV Movie' },
+    { id: 53, name: 'Thriller' },
+    { id: 10752, name: 'War' },
+    { id: 37, name: 'Western' }
   ];
   
-  // Initialize from URL query parameters if present
-  useEffect(() => {
-    if (router.query.search) {
-      setSearchQuery(router.query.search);
-    }
-    if (router.query.genre) {
-      setSelectedGenres([router.query.genre]);
-    }
-    if (router.query.decade) {
-      setSelectedDecades([router.query.decade]);
-    }
-    if (router.query.sort) {
-      setSortBy(router.query.sort);
-    }
-  }, [router.query]);
+  const decades = [
+    '2020s', '2010s', '2000s', '1990s', '1980s', 'Older'
+  ];
   
-  // Fetch all movies on initial load
+  const ratings = ['9+', '8+', '7+', '6+', 'Any'];
+  
+  const sortOptions = [
+    { value: 'popularity.desc', label: 'Popularity ↓' },
+    { value: 'vote_average.desc', label: 'Rating ↓' },
+    { value: 'release_date.desc', label: 'Newest First' },
+    { value: 'revenue.desc', label: 'Highest Grossing' },
+    { value: 'original_title.asc', label: 'Title A-Z' },
+  ];
+  
+  // Initialize from URL query parameters
   useEffect(() => {
-    const fetchMovies = async () => {
-      setIsLoading(true);
-      try {
-        const allMovies = await getAllMovies();
-        setMovies(allMovies);
-        setFilteredMovies(allMovies);
-      } catch (error) {
-        console.error('Error fetching movies:', error);
-      } finally {
-        setIsLoading(false);
+    if (router.isReady) {
+      if (router.query.search) {
+        setSearchQuery(router.query.search);
       }
-    };
-    
-    fetchMovies();
+      
+      if (router.query.genre) {
+        const genre = genres.find(g => g.name.toLowerCase() === router.query.genre.toLowerCase());
+        if (genre) {
+          setSelectedGenres([genre.id]);
+        }
+      }
+      
+      if (router.query.decade) {
+        setSelectedDecade(router.query.decade);
+      }
+      
+      if (router.query.mood) {
+        setSelectedMood(router.query.mood);
+      }
+      
+      if (router.query.sort) {
+        setSortBy(router.query.sort);
+      }
+      
+      if (router.query.view) {
+        setViewMode(router.query.view);
+      }
+      
+      setInitialLoadComplete(true);
+    }
+  }, [router.isReady, router.query, genres]);
+  
+  // Handle movie like
+  const handleMovieLike = useCallback((movie) => {
+    setLikedMovies(prev => [...prev, movie]);
   }, []);
   
-  // Apply filters whenever filter criteria change
-  useEffect(() => {
-    const applyFilters = async () => {
-      if (movies.length === 0) return;
+  // Handle movie dislike
+  const handleMovieDislike = useCallback((movie) => {
+    setDislikedMovies(prev => [...prev, movie]);
+  }, []);
+  
+  // Load more recommendations
+  const handleLoadMoreRecommendations = useCallback(() => {
+    fetchRecommendedMovies(currentPage + 1);
+  }, [currentPage]);
+  
+  // Fetch movies based on current filters
+  const fetchMovies = useCallback(async (page = 1) => {
+    setIsLoading(true);
+    
+    try {
+      let results;
       
-      setIsLoading(true);
-      
-      try {
-        // Start with all movies
-        let results = [...movies];
+      // Searching
+      if (searchQuery.trim()) {
+        const searchResults = await tmdbApi.searchMovies(searchQuery, page);
+        results = searchResults;
+      } 
+      // Mood-based filtering (takes precedence)
+      else if (selectedMood) {
+        const moodResults = await tmdbApi.getMoodBasedMovies(
+          selectedMood,
+          page
+        );
+        results = moodResults;
+      } 
+      // General discover with filters
+      else {
+        const filterOptions = {
+          page,
+          sortBy,
+        };
         
-        // Search query
-        if (searchQuery) {
-          const query = searchQuery.toLowerCase();
-          results = results.filter(movie => 
-            movie.title.toLowerCase().includes(query) || 
-            movie.overview.toLowerCase().includes(query)
-          );
-        }
-        
-        // Genre filter
+        // Add genre filter
         if (selectedGenres.length > 0) {
-          results = results.filter(movie => 
-            selectedGenres.some(genre => movie.genres.includes(genre))
-          );
+          filterOptions.genres = selectedGenres;
         }
         
-        // Decade filter
-        if (selectedDecades.length > 0) {
-          results = results.filter(movie => {
-            const year = new Date(movie.release_date).getFullYear();
-            return selectedDecades.some(decade => {
-              if (decade === '2020s') return year >= 2020;
-              if (decade === '2010s') return year >= 2010 && year < 2020;
-              if (decade === '2000s') return year >= 2000 && year < 2010;
-              if (decade === '1990s') return year >= 1990 && year < 2000;
-              if (decade === '1980s') return year >= 1980 && year < 1990;
-              if (decade === 'Older') return year < 1980;
-              return false;
+        // Add decade filter
+        if (selectedDecade) {
+          filterOptions.decade = selectedDecade;
+        }
+        
+        // Add rating filter
+        if (selectedRating) {
+          const minRating = parseInt(selectedRating.replace('+', ''));
+          filterOptions.minRating = minRating;
+        }
+        
+        const discoverResults = await tmdbApi.discoverMovies(filterOptions);
+        results = discoverResults;
+      }
+      
+      // Set total results and pages for pagination
+      setTotalResults(results.total_results);
+      setTotalPages(results.total_pages);
+      
+      // Transform results to our app format
+      const transformedMovies = results.results.map(tmdbApi.transformMovieData);
+      
+      if (page === 1) {
+        setMovies(transformedMovies);
+        setFilteredMovies(transformedMovies);
+      } else {
+        setMovies(prev => [...prev, ...transformedMovies]);
+        setFilteredMovies(prev => [...prev, ...transformedMovies]);
+      }
+      
+      // Update current page
+      setCurrentPage(page);
+    } catch (error) {
+      console.error('Error fetching movies:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [searchQuery, selectedMood, sortBy, selectedGenres, selectedDecade, selectedRating]);
+  
+  // Fetch recommended movies
+  const fetchRecommendedMovies = useCallback(async (page = 1) => {
+    try {
+      let results;
+      
+      // If there are liked movies, get recommendations based on their genres
+      if (likedMovies.length > 0) {
+        // Extract all genres from liked movies
+        const genreIds = [];
+        likedMovies.forEach(movie => {
+          if (movie.genres) {
+            // Convert genre names to IDs
+            movie.genres.forEach(genreName => {
+              const genre = genres.find(g => g.name === genreName);
+              if (genre && !genreIds.includes(genre.id)) {
+                genreIds.push(genre.id);
+              }
             });
+          }
+        });
+        
+        results = await tmdbApi.getRecommendedMovies(
+          genreIds.slice(0, 3), // Use top 3 genres
+          7.0,
+          page
+        );
+      } 
+      // Mood-based recommendations
+      else if (selectedMood) {
+        results = await tmdbApi.getMoodBasedMovies(selectedMood, page);
+      } 
+      // User preference based recommendations
+      else if (userProfile && userProfile.preferences) {
+        const userGenreIds = [];
+        
+        // Convert user's preferred genres to genre IDs
+        if (userProfile.preferences.genres) {
+          userProfile.preferences.genres.forEach(genreName => {
+            const genre = genres.find(g => g.name === genreName);
+            if (genre) {
+              userGenreIds.push(genre.id);
+            }
           });
         }
         
-        // Rating filter
-        if (selectedRating) {
-          const minRating = parseInt(selectedRating.replace('+', ''));
-          results = results.filter(movie => movie.vote_average >= minRating);
+        if (userGenreIds.length > 0) {
+          results = await tmdbApi.getRecommendedMovies(userGenreIds, 7.0, page);
+        } else {
+          // Fallback to popular movies
+          results = await tmdbApi.getPopularMovies(page);
         }
-        
-        // Sort results
-        if (sortBy === 'rating') {
-          results.sort((a, b) => b.vote_average - a.vote_average);
-        } else if (sortBy === 'release_date') {
-          results.sort((a, b) => new Date(b.release_date) - new Date(a.release_date));
-        } else if (sortBy === 'title_asc') {
-          results.sort((a, b) => a.title.localeCompare(b.title));
-        }
-        
-        setFilteredMovies(results);
-      } catch (error) {
-        console.error('Error applying filters:', error);
-      } finally {
-        setIsLoading(false);
+      } else {
+        // Fallback to popular movies
+        results = await tmdbApi.getPopularMovies(page);
       }
-    };
-    
-    applyFilters();
-  }, [movies, searchQuery, selectedGenres, selectedDecades, selectedRating, sortBy]);
+      
+      // Transform results to our app format
+      const transformedMovies = results.results.map(tmdbApi.transformMovieData);
+      
+      if (page === 1) {
+        setRecommendedMovies(transformedMovies);
+      } else {
+        setRecommendedMovies(prev => [...prev, ...transformedMovies]);
+      }
+    } catch (error) {
+      console.error('Error fetching recommended movies:', error);
+    }
+  }, [likedMovies, selectedMood, userProfile, genres]);
   
-  const toggleGenre = (genre) => {
-    setSelectedGenres(prev => 
-      prev.includes(genre) 
-        ? prev.filter(g => g !== genre)
-        : [...prev, genre]
-    );
+  // Initial data loading
+  useEffect(() => {
+    if (initialLoadComplete) {
+      fetchMovies(1);
+      fetchRecommendedMovies(1);
+    }
+  }, [initialLoadComplete, fetchMovies, fetchRecommendedMovies]);
+  
+  // Update when filters change
+  useEffect(() => {
+    if (initialLoadComplete) {
+      // Reset pagination
+      setCurrentPage(1);
+      
+      // Update URL with filters
+      const query = {};
+      
+      if (searchQuery) {
+        query.search = searchQuery;
+      }
+      
+      if (selectedGenres.length > 0) {
+        const genreName = genres.find(g => g.id === selectedGenres[0])?.name;
+        if (genreName) {
+          query.genre = genreName;
+        }
+      }
+      
+      if (selectedDecade) {
+        query.decade = selectedDecade;
+      }
+      
+      if (selectedMood) {
+        query.mood = selectedMood;
+      }
+      
+      if (sortBy && sortBy !== 'popularity.desc') {
+        query.sort = sortBy;
+      }
+      
+      if (viewMode !== 'grid') {
+        query.view = viewMode;
+      }
+      
+      router.push({ pathname: '/discover', query }, undefined, { shallow: true });
+      
+      // Fetch new data with filters
+      fetchMovies(1);
+    }
+  }, [
+    initialLoadComplete,
+    fetchMovies,
+    searchQuery,
+    selectedGenres,
+    selectedDecade,
+    selectedMood,
+    selectedRating,
+    sortBy,
+    viewMode,
+    genres,
+    router
+  ]);
+  
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    fetchMovies(1);
   };
   
-  const toggleDecade = (decade) => {
-    setSelectedDecades(prev => 
-      prev.includes(decade) 
-        ? prev.filter(d => d !== decade)
-        : [...prev, decade]
-    );
+  // Toggle view mode between grid and swiper
+  const toggleViewMode = () => {
+    setViewMode(prev => prev === 'grid' ? 'swiper' : 'grid');
   };
   
   const clearFilters = () => {
     setSelectedGenres([]);
-    setSelectedDecades([]);
+    setSelectedDecade('');
+    setSelectedMood('');
     setSelectedRating('');
     setSearchQuery('');
-    setSortBy('popularity');
+    setSortBy('popularity.desc');
     
     // Clear URL query params
     router.push('/discover', undefined, { shallow: true });
   };
   
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    // Update URL with search query
-    const query = { ...router.query };
-    if (searchQuery) {
-      query.search = searchQuery;
-    } else {
-      delete query.search;
-    }
-    router.push({ pathname: '/discover', query }, undefined, { shallow: true });
-  };
+  // Track if any filter is active
+  const hasActiveFilters = selectedGenres.length > 0 || selectedDecade || selectedMood || selectedRating || searchQuery || sortBy !== 'popularity.desc';
   
-  const hasActiveFilters = selectedGenres.length > 0 || selectedDecades.length > 0 || selectedRating || searchQuery;
+  // Load more movies
+  const handleLoadMore = () => {
+    if (currentPage < totalPages && !isLoading) {
+      fetchMovies(currentPage + 1);
+    }
+  };
   
   return (
     <Layout>
-      <div className="space-y-8">
+      <div className="space-y-8 mt-8">
         <div>
           <h1 className="text-3xl font-bold text-white mb-2">Discover Movies</h1>
           <p className="text-gray-300">
-            Explore our collection and find your next favorite film.
+            Find your next favorite film with personalized recommendations.
           </p>
         </div>
         
@@ -196,7 +384,7 @@ export default function Discover() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search movies..."
-                  className="block w-full pl-10 pr-10 py-3 border border-gray-700 rounded-lg bg-secondary text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="block w-full pl-10 pr-10 py-3 border border-gray-700 rounded-lg bg-secondary/60 backdrop-blur-sm text-white focus:outline-none focus:ring-2 focus:ring-primary"
                 />
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <FaSearch className="text-gray-400" />
@@ -206,9 +394,6 @@ export default function Discover() {
                     type="button"
                     onClick={() => {
                       setSearchQuery('');
-                      const query = { ...router.query };
-                      delete query.search;
-                      router.push({ pathname: '/discover', query }, undefined, { shallow: true });
                     }}
                     className="absolute inset-y-0 right-0 pr-3 flex items-center"
                   >
@@ -221,10 +406,10 @@ export default function Discover() {
             {/* Filter toggle button */}
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="px-4 py-3 bg-secondary text-white rounded-lg flex items-center justify-center hover:bg-secondary-light transition"
+              className="px-4 py-3 bg-secondary/60 backdrop-blur-sm text-white rounded-lg flex items-center justify-center hover:bg-secondary transition"
             >
               <FaFilter className="mr-2" />
-              {showFilters ? 'Hide Filters' : 'Show Filters'}
+              {showFilters ? 'Hide Filters' : 'Filters'}
             </button>
             
             {/* Sort dropdown */}
@@ -236,11 +421,8 @@ export default function Discover() {
                 value={sortBy}
                 onChange={(e) => {
                   setSortBy(e.target.value);
-                  // Update URL with sort parameter
-                  const query = { ...router.query, sort: e.target.value };
-                  router.push({ pathname: '/discover', query }, undefined, { shallow: true });
                 }}
-                className="block w-full pl-10 pr-10 py-3 border border-gray-700 rounded-lg bg-secondary text-white appearance-none focus:outline-none focus:ring-2 focus:ring-primary"
+                className="block w-full pl-10 pr-10 py-3 border border-gray-700 rounded-lg bg-secondary/60 backdrop-blur-sm text-white appearance-none focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 <option value="" disabled>Sort By</option>
                 {sortOptions.map(option => (
@@ -253,168 +435,223 @@ export default function Discover() {
                 </svg>
               </div>
             </div>
+            
+            {/* View mode toggle */}
+            <button
+              onClick={toggleViewMode}
+              className="px-4 py-3 bg-secondary/60 backdrop-blur-sm text-white rounded-lg flex items-center justify-center hover:bg-secondary transition"
+            >
+              {viewMode === 'grid' ? 'Swiper View' : 'Grid View'}
+            </button>
           </div>
           
-          {/* Filters panel */}
+          {/* Mood selector - only show if filters are visible */}
           {showFilters && (
-            <div className="bg-secondary rounded-xl overflow-hidden transition-all duration-300">
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-xl font-semibold text-white">Filter Movies</h2>
-                  {hasActiveFilters && (
-                    <button
-                      onClick={clearFilters}
-                      className="text-sm text-primary hover:text-primary-light flex items-center"
-                    >
-                      <FaTimes className="mr-1" />
-                      Clear All Filters
-                    </button>
-                  )}
+            <div className="bg-secondary/40 backdrop-blur-sm rounded-xl p-6 transition-all duration-300">
+              <div className="mb-6">
+                <h3 className="text-lg font-medium text-white mb-4">What's your mood today?</h3>
+                <MoodSelector onMoodSelect={(mood) => setSelectedMood(mood)} selectedMood={selectedMood} />
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Genres */}
+                <div>
+                  <h3 className="text-lg font-medium text-white mb-4">Genres</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {genres.map((genre) => (
+                      <button
+                        key={genre.id}
+                        onClick={() => {
+                          if (selectedGenres.includes(genre.id)) {
+                            setSelectedGenres(selectedGenres.filter(id => id !== genre.id));
+                          } else {
+                            setSelectedGenres([...selectedGenres, genre.id]);
+                          }
+                        }}
+                        className={`px-3 py-2 text-sm rounded-lg ${
+                          selectedGenres.includes(genre.id)
+                            ? 'bg-primary text-background'
+                            : 'bg-secondary-light text-gray-300 hover:bg-secondary hover:text-white'
+                        }`}
+                      >
+                        {genre.name}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {/* Genres */}
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-300 mb-3">Genres</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {genres.map((genre) => (
-                        <button
-                          key={genre}
-                          onClick={() => toggleGenre(genre)}
-                          className={`px-3 py-2 text-sm rounded-lg ${
-                            selectedGenres.includes(genre)
-                              ? 'bg-primary text-white'
-                              : 'bg-secondary-light text-gray-300 hover:bg-gray-600'
-                          }`}
-                        >
-                          {genre}
-                        </button>
-                      ))}
-                    </div>
+                {/* Decades */}
+                <div>
+                  <h3 className="text-lg font-medium text-white mb-4">Release Decade</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {decades.map((decade) => (
+                      <button
+                        key={decade}
+                        onClick={() => setSelectedDecade(selectedDecade === decade ? '' : decade)}
+                        className={`px-3 py-2 text-sm rounded-lg ${
+                          selectedDecade === decade
+                            ? 'bg-primary text-background'
+                            : 'bg-secondary-light text-gray-300 hover:bg-secondary hover:text-white'
+                        }`}
+                      >
+                        {decade}
+                      </button>
+                    ))}
                   </div>
-                  
-                  {/* Decades */}
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-300 mb-3">Release Decade</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {decades.map((decade) => (
-                        <button
-                          key={decade}
-                          onClick={() => toggleDecade(decade)}
-                          className={`px-3 py-2 text-sm rounded-lg ${
-                            selectedDecades.includes(decade)
-                              ? 'bg-primary text-white'
-                              : 'bg-secondary-light text-gray-300 hover:bg-gray-600'
-                          }`}
-                        >
-                          {decade}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  {/* Rating */}
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-300 mb-3">Minimum Rating</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {ratings.map((rating) => (
-                        <button
-                          key={rating}
-                          onClick={() => setSelectedRating(selectedRating === rating ? '' : rating)}
-                          className={`px-3 py-2 text-sm rounded-lg ${
-                            selectedRating === rating
-                              ? 'bg-primary text-white'
-                              : 'bg-secondary-light text-gray-300 hover:bg-gray-600'
-                          }`}
-                        >
-                          {rating}
-                        </button>
-                      ))}
-                    </div>
+                </div>
+                
+                {/* Rating */}
+                <div>
+                  <h3 className="text-lg font-medium text-white mb-4">Minimum Rating</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {ratings.map((rating) => (
+                      <button
+                        key={rating}
+                        onClick={() => setSelectedRating(selectedRating === rating ? '' : rating)}
+                        className={`px-3 py-2 text-sm rounded-lg ${
+                          selectedRating === rating
+                            ? 'bg-primary text-background'
+                            : 'bg-secondary-light text-gray-300 hover:bg-secondary hover:text-white'
+                        }`}
+                      >
+                        {rating}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
+              
+              {hasActiveFilters && (
+                <div className="mt-6 flex justify-end">
+                  <button
+                    onClick={clearFilters}
+                    className="px-4 py-2 text-primary hover:text-white transition-colors flex items-center"
+                  >
+                    <FaTimes className="mr-2" />
+                    Clear All Filters
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Active filters display */}
+          {hasActiveFilters && (
+            <div className="flex flex-wrap items-center gap-2 bg-secondary/20 backdrop-blur-sm rounded-lg p-4">
+              <span className="text-sm text-gray-400">Active filters:</span>
+              
+              {searchQuery && (
+                <div className="bg-secondary-light text-white px-3 py-1 rounded-full text-sm flex items-center">
+                  <FaSearch className="mr-1 text-xs" />
+                  {searchQuery}
+                  <button 
+                    onClick={() => setSearchQuery('')}
+                    className="ml-2 hover:text-primary"
+                  >
+                    <FaTimes size={12} />
+                  </button>
+                </div>
+              )}
+              
+              {selectedGenres.map(genreId => {
+                const genre = genres.find(g => g.id === genreId);
+                return genre ? (
+                  <div key={genreId} className="bg-primary/20 text-primary px-3 py-1 rounded-full text-sm flex items-center">
+                    {genre.name}
+                    <button 
+                      onClick={() => setSelectedGenres(selectedGenres.filter(id => id !== genreId))}
+                      className="ml-2 hover:text-white"
+                    >
+                      <FaTimes size={12} />
+                    </button>
+                  </div>
+                ) : null;
+              })}
+              
+              {selectedDecade && (
+                <div className="bg-primary/20 text-primary px-3 py-1 rounded-full text-sm flex items-center">
+                  <FaCalendarAlt className="mr-1 text-xs" />
+                  {selectedDecade}
+                  <button 
+                    onClick={() => setSelectedDecade('')}
+                    className="ml-2 hover:text-white"
+                  >
+                    <FaTimes size={12} />
+                  </button>
+                </div>
+              )}
+              
+              {selectedMood && (
+                <div className="bg-primary/20 text-primary px-3 py-1 rounded-full text-sm flex items-center">
+                  Mood: {selectedMood.replace('-', ' ')}
+                  <button 
+                    onClick={() => setSelectedMood('')}
+                    className="ml-2 hover:text-white"
+                  >
+                    <FaTimes size={12} />
+                  </button>
+                </div>
+              )}
+              
+              {selectedRating && (
+                <div className="bg-primary/20 text-primary px-3 py-1 rounded-full text-sm flex items-center">
+                  <FaStar className="mr-1 text-xs" />
+                  Rating: {selectedRating}
+                  <button 
+                    onClick={() => setSelectedRating('')}
+                    className="ml-2 hover:text-white"
+                  >
+                    <FaTimes size={12} />
+                  </button>
+                </div>
+              )}
+              
+              {sortBy !== 'popularity.desc' && (
+                <div className="bg-primary/20 text-primary px-3 py-1 rounded-full text-sm flex items-center">
+                  <FaSortAmountDown className="mr-1 text-xs" />
+                  {sortOptions.find(opt => opt.value === sortBy)?.label || 'Custom Sort'}
+                  <button 
+                    onClick={() => setSortBy('popularity.desc')}
+                    className="ml-2 hover:text-white"
+                  >
+                    <FaTimes size={12} />
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
         
-        {/* Active filters display */}
-        {hasActiveFilters && (
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm text-gray-400">Active filters:</span>
-            
-            {searchQuery && (
-              <div className="bg-secondary-light text-white px-3 py-1 rounded-full text-sm flex items-center">
-                Search: {searchQuery}
-                <button 
-                  onClick={() => {
-                    setSearchQuery('');
-                    const query = { ...router.query };
-                    delete query.search;
-                    router.push({ pathname: '/discover', query }, undefined, { shallow: true });
-                  }}
-                  className="ml-2 hover:text-primary"
-                >
-                  <FaTimes size={12} />
-                </button>
-              </div>
-            )}
-            
-            {selectedGenres.map(genre => (
-              <div key={genre} className="bg-primary bg-opacity-20 text-primary px-3 py-1 rounded-full text-sm flex items-center">
-                {genre}
-                <button 
-                  onClick={() => toggleGenre(genre)}
-                  className="ml-2 hover:text-white"
-                >
-                  <FaTimes size={12} />
-                </button>
-              </div>
-            ))}
-            
-            {selectedDecades.map(decade => (
-              <div key={decade} className="bg-primary bg-opacity-20 text-primary px-3 py-1 rounded-full text-sm flex items-center">
-                {decade}
-                <button 
-                  onClick={() => toggleDecade(decade)}
-                  className="ml-2 hover:text-white"
-                >
-                  <FaTimes size={12} />
-                </button>
-              </div>
-            ))}
-            
-            {selectedRating && (
-              <div className="bg-primary bg-opacity-20 text-primary px-3 py-1 rounded-full text-sm flex items-center">
-                Rating: {selectedRating}
-                <button 
-                  onClick={() => setSelectedRating('')}
-                  className="ml-2 hover:text-white"
-                >
-                  <FaTimes size={12} />
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-        
         {/* Results */}
         <div>
-          {isLoading ? (
+          {isLoading && movies.length === 0 ? (
             <div className="py-20">
               <div className="flex flex-col items-center justify-center space-y-4">
-                <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                <FaCircleNotch className="w-16 h-16 text-primary animate-spin" />
                 <p className="text-white/80">Finding movies for you...</p>
               </div>
             </div>
+          ) : viewMode === 'swiper' ? (
+            <div className="py-6">
+              <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
+                <FaFire className="mr-2 text-primary" />
+                Recommended for You
+              </h2>
+              <RevampedRecommendation 
+                movies={selectedMood ? filteredMovies : recommendedMovies.length > 0 ? recommendedMovies : filteredMovies} 
+                onLike={handleMovieLike}
+                onDislike={handleMovieDislike}
+                onLoadMore={handleLoadMoreRecommendations}
+              />
+            </div>
           ) : filteredMovies.length === 0 ? (
-            <div className="bg-secondary rounded-xl p-8 text-center">
+            <div className="bg-secondary/40 backdrop-blur-sm rounded-xl p-8 text-center">
               <h2 className="text-xl font-semibold text-white mb-4">No movies found</h2>
               <p className="text-gray-300 mb-6">Try adjusting your filters or search query</p>
               {hasActiveFilters && (
                 <button
                   onClick={clearFilters}
-                  className="px-4 py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition"
+                  className="px-4 py-3 bg-primary text-background rounded-lg hover:bg-primary-dark transition"
                 >
                   Clear All Filters
                 </button>
@@ -424,19 +661,41 @@ export default function Discover() {
             <>
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-semibold text-white">
-                  {filteredMovies.length} {filteredMovies.length === 1 ? 'Movie' : 'Movies'} Found
+                  {totalResults} {totalResults === 1 ? 'Movie' : 'Movies'} Found
                 </h2>
               </div>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {filteredMovies.map((movie) => (
-                  <MovieCard key={movie.id} movie={movie} />
+                  <EnhancedMovieCard key={movie.id} movie={movie} />
                 ))}
               </div>
+              
+              {/* Load more button */}
+              {currentPage < totalPages && (
+                <div className="mt-8 flex justify-center">
+                  <button
+                    onClick={handleLoadMore}
+                    className="px-6 py-3 bg-primary/20 hover:bg-primary/30 text-primary font-medium rounded-lg transition flex items-center"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <>
+                        <FaCircleNotch className="animate-spin mr-2" />
+                        Loading...
+                      </>
+                    ) : (
+                      'Load More'
+                    )}
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>
       </div>
     </Layout>
   );
-}
+};
+
+export default DiscoverPage;
