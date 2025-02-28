@@ -3,12 +3,23 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '../contexts/AuthContext';
 import { logOut } from '../utils/firebase';
-import { FaHome, FaUser, FaList, FaSignOutAlt, FaFilm, FaCompass, FaHeart, FaBookmark, FaUsers } from 'react-icons/fa';
+import { 
+  FaHome, 
+  FaUser, 
+  FaSignOutAlt, 
+  FaFilm, 
+  FaCompass, 
+  FaBookmark, 
+  FaUsers,
+  FaSearch
+} from 'react-icons/fa';
+import { motion } from 'framer-motion';
 
 export default function Layout({ children }) {
   const { currentUser, userProfile } = useAuth();
   const router = useRouter();
   const [scrolled, setScrolled] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -18,8 +29,6 @@ export default function Layout({ children }) {
       console.error("Error logging out", error);
     }
   };
-
-  // We've removed the mobile menu code since we're using the bottom toolbar
 
   // Handle scroll effect for navbar
   useEffect(() => {
@@ -37,60 +46,89 @@ export default function Layout({ children }) {
     };
   }, []);
 
+  // Close profile menu when route changes
+  useEffect(() => {
+    setProfileMenuOpen(false);
+  }, [router.pathname]);
+
+  // Check if page is discover page to add extra styling
+  const isDiscoverPage = router.pathname === '/discover';
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
-      {/* Header */}
-      <header className={`top-0 z-30 transition-all duration-300 ${scrolled ? 'bg-background/90 backdrop-blur-md shadow-md' : 'bg-transparent'}`}>
-        <div className="container mx-auto px-4 py-4 flex flex-col md:flex-row md:justify-between items-center">
-          <div className="flex justify-center w-full md:w-auto md:justify-start">
-            <Link href="/" className="flex items-center">
-              <div className="text-primary text-3xl font-bold flex items-center">
-                <FaFilm className="mr-2" />
-                <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent">CineMagic</span>
-              </div>
-            </Link>
-          </div>
+      {/* Mobile app-like status bar - generally hidden, but shown on some pages for app-like experience */}
+      {currentUser && !isDiscoverPage && (
+        <div className="h-6 bg-background hidden">
+          {/* This is just a spacer for iOS-like status bar */}
+        </div>
+      )}
+
+      {/* Header - hidden on discover page for more app-like experience */}
+      <header 
+        className={`sticky top-0 z-30 transition-all duration-300 ${
+          isDiscoverPage ? 'md:block hidden' : ''
+        } ${
+          scrolled ? 'bg-background/90 backdrop-blur-md shadow-md' : 'bg-transparent'
+        }`}
+      >
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+          <Link href="/" className="flex items-center">
+            <div className="text-primary text-2xl font-bold flex items-center">
+              <FaFilm className="mr-2" />
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent">CineMagic</span>
+            </div>
+          </Link>
           
-          {/* Desktop auth buttons */}
+          {/* Desktop nav links */}
           <nav className="hidden md:flex space-x-1 items-center">
             {currentUser ? (
               <>
                 <NavLink href="/" icon={<FaHome />} title="Home" pathname={router.pathname} />
-                <NavLink href="/watchlist" icon={<FaBookmark />} title="Watchlist" pathname={router.pathname} />
                 <NavLink href="/discover" icon={<FaCompass />} title="Discover" pathname={router.pathname} />
+                <NavLink href="/watchlist" icon={<FaBookmark />} title="Watchlist" pathname={router.pathname} />
                 <NavLink href="/social" icon={<FaUsers />} title="Social" pathname={router.pathname} />
                 
                 <div className="relative group ml-2">
-                  <button className="flex items-center space-x-1 px-3 py-2 text-white hover:text-primary">
+                  <button 
+                    className="flex items-center space-x-1 px-3 py-2 text-white hover:text-primary"
+                    onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+                  >
                     <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
                       {userProfile && userProfile.displayName ? (
-                        <span className="text-white font-semibold">{userProfile.displayName.charAt(0)}</span>
+                        <span className="text-black font-semibold">{userProfile.displayName.charAt(0)}</span>
                       ) : (
-                        <FaUser className="text-white" />
+                        <FaUser className="text-black" />
                       )}
                     </div>
                   </button>
                   
-                  <div className="absolute right-0 mt-1 w-48 bg-secondary-light rounded-xl shadow-lg overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform origin-top-right">
-                    <div className="py-2">
-                      <Link href="/profile" className="flex items-center px-4 py-3 text-white hover:bg-background transition-colors">
-                        <FaUser className="mr-3 text-primary" />
-                        <span>My Profile</span>
-                      </Link>
-                      <Link href="/watchlist" className="flex items-center px-4 py-3 text-white hover:bg-background transition-colors">
-                        <FaBookmark className="mr-3 text-primary" />
-                        <span>My Watchlist</span>
-                      </Link>
-                      <hr className="border-gray-700 my-1" />
-                      <button 
-                        onClick={handleLogout}
-                        className="flex items-center w-full text-left px-4 py-3 text-white hover:bg-background transition-colors"
-                      >
-                        <FaSignOutAlt className="mr-3 text-primary" />
-                        <span>Logout</span>
-                      </button>
-                    </div>
-                  </div>
+                  {profileMenuOpen && (
+                    <motion.div 
+                      className="absolute right-0 mt-2 w-48 bg-secondary rounded-xl shadow-xl overflow-hidden z-50"
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                    >
+                      <div className="py-2">
+                        <Link href="/profile" className="flex items-center px-4 py-3 text-white hover:bg-background transition-colors">
+                          <FaUser className="mr-3 text-primary" />
+                          <span>My Profile</span>
+                        </Link>
+                        <Link href="/watchlist" className="flex items-center px-4 py-3 text-white hover:bg-background transition-colors">
+                          <FaBookmark className="mr-3 text-primary" />
+                          <span>My Watchlist</span>
+                        </Link>
+                        <hr className="border-gray-700 my-1" />
+                        <button 
+                          onClick={handleLogout}
+                          className="flex items-center w-full text-left px-4 py-3 text-white hover:bg-background transition-colors"
+                        >
+                          <FaSignOutAlt className="mr-3 text-primary" />
+                          <span>Logout</span>
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
                 </div>
               </>
             ) : (
@@ -98,36 +136,51 @@ export default function Layout({ children }) {
                 <Link href="/login" className="text-white hover:text-primary transition px-5 py-2 rounded-md">
                   Login
                 </Link>
-                <Link href="/signup" className="bg-primary text-white px-5 py-2 rounded-full hover:bg-primary-dark transition transform hover:scale-105">
+                <Link href="/signup" className="bg-primary text-black px-5 py-2 rounded-full hover:bg-primary-dark transition transform hover:scale-105">
                   Sign Up
                 </Link>
               </>
             )}
           </nav>
+          
+          {/* Mobile header actions */}
+          {currentUser && !isDiscoverPage && (
+            <div className="flex md:hidden items-center">
+              <Link href="/profile" className="p-2 text-white">
+                <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
+                  {userProfile && userProfile.displayName ? (
+                    <span className="text-primary font-semibold">{userProfile.displayName.charAt(0)}</span>
+                  ) : (
+                    <FaUser className="text-primary" />
+                  )}
+                </div>
+              </Link>
+            </div>
+          )}
         </div>
-        
-        {/* Removed mobile menu - we use the toolbar instead */}
       </header>
       
       {/* Main content */}
-      <main className="flex-grow container mx-auto px-4 py-6 pb-24 md:pb-16">
+      <main className={`flex-grow ${isDiscoverPage ? '' : 'container mx-auto px-4 py-4'}`}>
         {children}
       </main>
       
       {/* Mobile navigation bar */}
       {currentUser && (
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-secondary/90 backdrop-blur-md border-t border-gray-800 flex justify-around items-center py-3 z-30">
-          <MobileNavIcon href="/" icon={<FaHome />} title="Home" pathname={router.pathname} />
-          <MobileNavIcon href="/watchlist" icon={<FaBookmark />} title="Watchlist" pathname={router.pathname} />
-          <MobileNavIcon href="/discover" icon={<FaCompass />} title="Discover" pathname={router.pathname} />
-          <MobileNavIcon href="/social" icon={<FaUsers />} title="Social" pathname={router.pathname} />
-          <MobileNavIcon href="/profile" icon={<FaUser />} title="Profile" pathname={router.pathname} />
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-secondary/90 backdrop-blur-md z-30 shadow-top">
+          <div className="flex justify-around items-center">
+            <MobileNavIcon href="/" icon={<FaHome />} title="Home" pathname={router.pathname} />
+            <MobileNavIcon href="/discover" icon={<FaCompass />} title="Discover" pathname={router.pathname} />
+            <MobileNavIcon href="/search" icon={<FaSearch />} title="Search" pathname={router.pathname} />
+            <MobileNavIcon href="/watchlist" icon={<FaBookmark />} title="Watchlist" pathname={router.pathname} />
+            <MobileNavIcon href="/profile" icon={<FaUser />} title="Profile" pathname={router.pathname} />
+          </div>
         </nav>
       )}
       
-      {/* Footer - only shown on larger screens or when not logged in */}
-      {(!currentUser || !router.pathname.startsWith('/movie/')) && (
-        <footer className="bg-secondary py-12 mt-12">
+      {/* Footer - only shown on desktop or when not logged in */}
+      {(!currentUser || window.innerWidth >= 768) && (
+        <footer className="bg-secondary py-12 mt-12 hidden md:block">
           <div className="container mx-auto px-4">
             <div className="flex flex-col md:flex-row justify-between">
               <div className="mb-8 md:mb-0">
@@ -163,8 +216,8 @@ export default function Layout({ children }) {
                 <div>
                   <h3 className="text-white font-semibold mb-4">Legal</h3>
                   <ul className="space-y-2">
-                    <li><Link href="/terms" className="text-gray-400 hover:text-primary">Terms of Service</Link></li>
-                    <li><Link href="/privacy" className="text-gray-400 hover:text-primary">Privacy Policy</Link></li>
+                    <li><Link href="/terms" className="text-gray-400 hover:text-primary">Terms</Link></li>
+                    <li><Link href="/privacy" className="text-gray-400 hover:text-primary">Privacy</Link></li>
                   </ul>
                 </div>
               </div>
@@ -203,42 +256,33 @@ function NavLink({ href, icon, title, pathname }) {
   );
 }
 
-// Mobile navigation link
-function MobileNavLink({ href, icon, title, pathname }) {
-  const isActive = pathname === href || 
-    (href !== '/' && pathname.startsWith(href));
-    
-  return (
-    <Link 
-      href={href} 
-      className={`flex items-center p-3 rounded-xl ${
-        isActive 
-          ? 'bg-primary/10 text-primary' 
-          : 'text-white hover:bg-background/50'
-      }`}
-    >
-      <span className="mr-3">{icon}</span>
-      <span>{title}</span>
-    </Link>
-  );
-}
-
-// Mobile bottom navigation icon
+// Mobile navigation icon
 function MobileNavIcon({ href, icon, title, pathname }) {
   const isActive = pathname === href || 
     (href !== '/' && pathname.startsWith(href));
-    
+  
   return (
     <Link 
       href={href} 
-      className={`flex flex-col items-center justify-center w-full text-xs py-1 ${
-        isActive ? 'text-primary' : 'text-gray-400'
+      className={`flex flex-col items-center justify-center py-3 w-full ${
+        isActive ? 'text-primary' : 'text-gray-400 active:text-gray-300'
       }`}
     >
-      <div className={`text-xl mb-1 ${isActive ? 'text-primary' : 'text-gray-400'}`}>
+      <motion.div 
+        className={`text-lg mb-1 ${isActive ? 'text-primary' : 'text-gray-400'}`}
+        whileTap={{ scale: 0.8 }}
+      >
         {icon}
-      </div>
-      <span>{title}</span>
+      </motion.div>
+      <span className="text-xs">{title}</span>
+      
+      {isActive && (
+        <motion.div 
+          className="absolute top-0 w-1/5 h-0.5 bg-primary rounded-b-full"
+          layoutId="activeTabIndicator"
+          initial={false}
+        />
+      )}
     </Link>
   );
 }
