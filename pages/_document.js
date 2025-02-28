@@ -13,6 +13,7 @@ export default function Document() {
         />
         <meta name="description" content="Discover movies tailored to your preferences" />
         <meta name="theme-color" content="#141414" />
+        <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </Head>
