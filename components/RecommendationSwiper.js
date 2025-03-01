@@ -1,37 +1,18 @@
+// components/RecommendationSwiper.js
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaHeart, FaTimes, FaBookmark, FaInfoCircle, FaPlay } from 'react-icons/fa';
-import Link from 'next/link';
-import { useRouter } from 'next/router';
+import { FaHeart, FaTimes, FaInfoCircle, FaBookmark } from 'react-icons/fa';
 import { useAuth } from '../contexts/AuthContext';
 import { addToWatchlist } from '../utils/firebase';
 
-const MovieCard = ({ movie, onLike, onDislike, onShowDetails, isVisible }) => {
+// Movie Card Component - Tinder Style
+const MovieCard = ({ movie, onLike, onDislike, onBookmark, onShowDetails, isActive }) => {
   const [touchStart, setTouchStart] = useState({ x: 0, y: 0 });
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [swipeDirection, setSwipeDirection] = useState(null);
-  const [expanded, setExpanded] = useState(false);
-  const { currentUser } = useAuth();
-  const router = useRouter();
   const cardRef = useRef(null);
 
-  // Handle adding to watchlist
-  const handleAddToWatchlist = async (e) => {
-    e.stopPropagation();
-    if (!currentUser) {
-      router.push('/login');
-      return;
-    }
-    
-    try {
-      await addToWatchlist(currentUser.uid, movie.id, movie);
-      // Could add toast notification here
-    } catch (error) {
-      console.error("Error adding to watchlist:", error);
-    }
-  };
-
-  // Touch handlers for swipe gestures
+  // Handle touch events for swipe functionality
   const handleTouchStart = (e) => {
     setTouchStart({
       x: e.touches[0].clientX,
@@ -66,16 +47,6 @@ const MovieCard = ({ movie, onLike, onDislike, onShowDetails, isVisible }) => {
     setOffset({ x: 0, y: 0 });
     setSwipeDirection(null);
   };
-  
-  // Format runtime from minutes to hours and minutes
-  const formatRuntime = (minutes) => {
-    if (!minutes) return '';
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60;
-    return hours > 0 
-      ? `${hours}h ${remainingMinutes > 0 ? `${remainingMinutes}m` : ''}`
-      : `${remainingMinutes}m`;
-  };
 
   // Calculate card style based on swipe
   const getCardStyle = () => {
@@ -86,25 +57,19 @@ const MovieCard = ({ movie, onLike, onDislike, onShowDetails, isVisible }) => {
     };
   };
 
-  // Get poster and backdrop URLs
+  // Get poster URL
   const posterUrl = `https://image.tmdb.org/t/p/w500${movie.poster_path}`;
-  const backdropUrl = movie.backdrop_path ? 
-    `https://image.tmdb.org/t/p/w780${movie.backdrop_path}` : 
-    posterUrl;
 
   return (
     <motion.div
-      className={`relative w-full overflow-hidden bg-secondary rounded-xl shadow-lg ${
-        expanded ? 'h-auto' : 'aspect-[2/3]'
-      }`}
+      className="relative w-full rounded-xl overflow-hidden aspect-[3/4] shadow-lg"
       ref={cardRef}
       style={getCardStyle()}
-      animate={{ opacity: isVisible ? 1 : 0, scale: isVisible ? 1 : 0.8 }}
+      animate={{ opacity: isActive ? 1 : 0, scale: isActive ? 1 : 0.8 }}
       transition={{ duration: 0.3 }}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
-      onClick={() => setExpanded(!expanded)}
     >
       {/* Swipe direction indicator */}
       {swipeDirection === 'right' && (
@@ -123,149 +88,187 @@ const MovieCard = ({ movie, onLike, onDislike, onShowDetails, isVisible }) => {
         </div>
       )}
 
-      {/* Background image with gradient overlay */}
-      <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${backdropUrl})` }}>
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent"></div>
-      </div>
+      {/* Movie Poster as full background */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center"
+        style={{ backgroundImage: `url(${posterUrl})` }}
+      />
       
-      <div className="relative z-2 h-full flex flex-col">
-        {/* Movie poster and title */}
-        <div className="p-4 flex">
-          <div className="w-1/3 rounded-lg overflow-hidden shadow-lg">
-            <img
-              src={posterUrl}
-              alt={movie.title}
-              className="w-full h-auto"
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = '/placeholder-poster.jpg';
-              }}
-            />
+      {/* Gradient overlay at bottom for text visibility */}
+      <div className="absolute bottom-0 left-0 right-0 h-1/4 bg-gradient-to-t from-black to-transparent" />
+      
+      {/* Movie information at bottom */}
+      <div className="absolute bottom-0 left-0 right-0 p-4">
+        <div className="flex justify-between items-end">
+          <div className="flex-grow">
+            <h2 className="text-xl font-bold text-white">
+              {movie.title}
+              <span className="text-white/80 text-sm ml-1">
+                {movie.release_date ? new Date(movie.release_date).getFullYear() : ''}
+              </span>
+            </h2>
+            {movie.genres && movie.genres.length > 0 && (
+              <p className="text-white/80 text-sm line-clamp-1">
+                {movie.genres.join(', ')}
+              </p>
+            )}
           </div>
-          
-          <div className="ml-3 flex-grow">
-            <h2 className="text-xl font-bold text-white line-clamp-2">{movie.title}</h2>
-            
-            <div className="flex items-center mt-1 text-sm text-gray-300">
-              <span>{movie.release_date ? new Date(movie.release_date).getFullYear() : ''}</span>
-              
-              {movie.runtime && (
-                <>
-                  <span className="mx-2">•</span>
-                  <span>{formatRuntime(movie.runtime)}</span>
-                </>
-              )}
-            </div>
-            
-            <div className="mt-2 flex items-center bg-accent/30 w-fit px-2 py-1 rounded-md">
-              <FaHeart className="text-red-500 mr-1 text-xs" />
-              <span className="text-white text-sm">{movie.vote_average?.toFixed(1)}</span>
-            </div>
-          </div>
-        </div>
-        
-        {/* Genres */}
-        {movie.genres && movie.genres.length > 0 && (
-          <div className="px-4 -mt-1">
-            <div className="flex flex-wrap gap-1">
-              {movie.genres.slice(0, 3).map((genre, index) => (
-                <span
-                  key={index}
-                  className="text-xs bg-secondary-light/50 backdrop-blur-sm text-gray-300 px-2 py-0.5 rounded-full"
-                >
-                  {genre}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-        
-        {/* Movie description */}
-        <div className="px-4 pt-2 flex-grow">
-          <p className={`text-gray-300 text-sm ${expanded ? '' : 'line-clamp-3'}`}>
-            {movie.overview}
-          </p>
-          
-          {!expanded && movie.overview && movie.overview.length > 150 && (
-            <button 
-              className="text-primary text-xs mt-1"
-              onClick={(e) => {
-                e.stopPropagation();
-                setExpanded(true);
-              }}
-            >
-              Show more
-            </button>
-          )}
-        </div>
-        
-        {/* Action buttons */}
-        <div className="p-4 flex justify-between items-center">
-          <div className="flex space-x-2">
-            <button
-              className="bg-secondary-light w-8 h-8 rounded-full flex items-center justify-center text-white"
-              onClick={(e) => {
-                e.stopPropagation();
-                onShowDetails(movie);
-              }}
-            >
-              <FaInfoCircle />
-            </button>
-            
-            <Link
-              href={`https://www.youtube.com/results?search_query=${encodeURIComponent(movie.title + ' trailer')}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="bg-secondary-light w-8 h-8 rounded-full flex items-center justify-center text-white"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <FaPlay />
-            </Link>
-            
-            <button
-              className="bg-secondary-light w-8 h-8 rounded-full flex items-center justify-center text-white"
-              onClick={handleAddToWatchlist}
-            >
-              <FaBookmark />
-            </button>
-          </div>
-          
-          <div className="flex space-x-3">
-            <motion.button
-              whileTap={{ scale: 0.9 }}
-              className="bg-red-500 w-12 h-12 rounded-full flex items-center justify-center shadow-lg"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDislike(movie);
-              }}
-            >
-              <FaTimes className="text-white text-xl" />
-            </motion.button>
-            
-            <motion.button
-              whileTap={{ scale: 0.9 }}
-              className="bg-green-500 w-12 h-12 rounded-full flex items-center justify-center shadow-lg"
-              onClick={(e) => {
-                e.stopPropagation();
-                onLike(movie);
-              }}
-            >
-              <FaHeart className="text-white text-xl" />
-            </motion.button>
-          </div>
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              onShowDetails(movie);
+            }}
+            className="text-white ml-2"
+            aria-label="Show movie details"
+          >
+            <FaInfoCircle className="text-xl" />
+          </button>
         </div>
       </div>
     </motion.div>
   );
 };
 
+// Movie Details Popup Component
+const MovieDetailsPopup = ({ movie, onClose }) => {
+  if (!movie) return null;
+  
+  const posterUrl = `https://image.tmdb.org/t/p/w500${movie.poster_path}`;
+  
+  // Format runtime from minutes to hours and minutes
+  const formatRuntime = (minutes) => {
+    if (!minutes) return '';
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return hours > 0 
+      ? `${hours}h ${remainingMinutes > 0 ? `${remainingMinutes}m` : ''}`
+      : `${remainingMinutes}m`;
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop overlay */}
+      <div 
+        className="absolute inset-0 bg-black/80"
+        onClick={onClose}
+      />
+      
+      {/* Movie details card */}
+      <div className="relative w-full max-w-lg bg-background rounded-xl overflow-hidden max-h-[90vh] overflow-y-auto z-10">
+        {/* Close button */}
+        <button
+          className="absolute top-3 right-3 z-20 bg-black/50 p-2 rounded-full"
+          onClick={onClose}
+        >
+          <FaTimes className="text-white" />
+        </button>
+        
+        {/* Movie poster */}
+        <div className="w-full h-64 relative">
+          <img 
+            src={posterUrl} 
+            alt={movie.title} 
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent" />
+        </div>
+        
+        {/* Content area */}
+        <div className="p-4">
+          <h2 className="text-2xl font-bold text-white mb-2">{movie.title}</h2>
+          
+          <div className="flex items-center text-sm text-gray-300 mb-4">
+            <span>{movie.release_date ? new Date(movie.release_date).getFullYear() : ''}</span>
+            {movie.runtime && (
+              <>
+                <span className="mx-2">•</span>
+                <span>{formatRuntime(movie.runtime)}</span>
+              </>
+            )}
+          </div>
+          
+          {/* Genres */}
+          {movie.genres && movie.genres.length > 0 && (
+            <div className="mb-4">
+              <div className="flex flex-wrap gap-1">
+                {movie.genres.map((genre, index) => (
+                  <span
+                    key={index}
+                    className="text-xs bg-secondary-light text-gray-300 px-2 py-1 rounded-full"
+                  >
+                    {genre}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Overview */}
+          <div className="mb-4">
+            <h3 className="text-white font-medium mb-2">Overview</h3>
+            <p className="text-gray-300 text-sm">{movie.overview}</p>
+          </div>
+          
+          {/* Cast and additional details */}
+          {movie.director && (
+            <div className="mb-4">
+              <h3 className="text-white font-medium mb-1">Director</h3>
+              <p className="text-gray-300 text-sm">{movie.director}</p>
+            </div>
+          )}
+            
+          {movie.cast && movie.cast.length > 0 && (
+            <div className="mb-4">
+              <h3 className="text-white font-medium mb-1">Cast</h3>
+              <p className="text-gray-300 text-sm">{movie.cast.join(', ')}</p>
+            </div>
+          )}
+          
+          {/* Back button */}
+          <div className="flex justify-center mt-6">
+            <button
+              onClick={onClose}
+              className="bg-primary text-black px-6 py-2 rounded-full font-medium"
+            >
+              Back to Swiping
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Main RecommendationSwiper Component
 export default function RecommendationSwiper({ movies, onLike, onDislike, onLoadMore }) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const router = useRouter();
+  const [showDetails, setShowDetails] = useState(false);
+  const [selectedMovie, setSelectedMovie] = useState(null);
+  const { currentUser } = useAuth();
   
-  // Go to movie details
-  const handleShowDetails = (movie) => {
-    router.push(`/movie/${movie.id}`);
+  // Handle adding to watchlist
+  const handleBookmark = async (movie) => {
+    if (!currentUser) return;
+    
+    try {
+      await addToWatchlist(currentUser.uid, movie.id, movie);
+      // Could add toast notification here
+    } catch (error) {
+      console.error("Error adding to watchlist:", error);
+    }
+    
+    // Move to next movie after bookmarking
+    nextMovie();
+  };
+  
+  // Go to next movie
+  const nextMovie = () => {
+    if (currentIndex >= movies.length - 1) {
+      // We're at the end - load more movies
+      if (onLoadMore) onLoadMore();
+    } else {
+      setCurrentIndex(currentIndex + 1);
+    }
   };
   
   // Handle like
@@ -280,23 +283,21 @@ export default function RecommendationSwiper({ movies, onLike, onDislike, onLoad
     nextMovie();
   };
   
-  // Go to next movie
-  const nextMovie = () => {
-    if (currentIndex >= movies.length - 1) {
-      // We're at the end - load more movies
-      if (onLoadMore) onLoadMore();
-      
-      // Reset index if we're at the end
-      setCurrentIndex(0);
-    } else {
-      setCurrentIndex(currentIndex + 1);
-    }
+  // Show movie details
+  const handleShowDetails = (movie) => {
+    setSelectedMovie(movie);
+    setShowDetails(true);
+  };
+  
+  // Close movie details
+  const handleCloseDetails = () => {
+    setShowDetails(false);
   };
   
   // Loading state
   if (!movies || movies.length === 0) {
     return (
-      <div className="w-full aspect-[2/3] bg-secondary/50 rounded-xl flex items-center justify-center">
+      <div className="w-full aspect-[3/4] bg-secondary/50 rounded-xl flex items-center justify-center">
         <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
@@ -304,8 +305,8 @@ export default function RecommendationSwiper({ movies, onLike, onDislike, onLoad
   
   return (
     <div className="relative w-full mx-auto max-w-md">
-      <div className="relative aspect-[2/3]">
-        {/* Display multiple cards stacked */}
+      {/* Movie cards stack */}
+      <div className="relative aspect-[3/4]">
         <AnimatePresence>
           {movies.slice(currentIndex, currentIndex + 3).map((movie, index) => (
             <div 
@@ -320,17 +321,18 @@ export default function RecommendationSwiper({ movies, onLike, onDislike, onLoad
                 movie={movie}
                 onLike={handleLike}
                 onDislike={handleDislike}
+                onBookmark={handleBookmark}
                 onShowDetails={handleShowDetails}
-                isVisible={index === 0}
+                isActive={index === 0}
               />
             </div>
           ))}
         </AnimatePresence>
       </div>
 
-      {/* Mobile action buttons - only shown on smaller screens */}
-      <div className="flex justify-center mt-6 md:hidden">
-        <div className="flex space-x-6">
+      {/* Mobile toolbar with action buttons */}
+      <div className="fixed bottom-0 left-0 right-0 bg-background/90 backdrop-blur-md py-4 px-4 z-30 border-t border-gray-800 shadow-lg">
+        <div className="container mx-auto flex justify-center items-center space-x-6 max-w-md">
           <motion.button
             whileTap={{ scale: 0.9 }}
             className="bg-red-500 w-16 h-16 rounded-full flex items-center justify-center shadow-lg"
@@ -341,10 +343,10 @@ export default function RecommendationSwiper({ movies, onLike, onDislike, onLoad
           
           <motion.button
             whileTap={{ scale: 0.9 }}
-            className="bg-secondary-light w-12 h-12 rounded-full flex items-center justify-center shadow-lg mt-2"
-            onClick={() => handleShowDetails(movies[currentIndex])}
+            className="bg-blue-500 w-14 h-14 rounded-full flex items-center justify-center shadow-lg"
+            onClick={() => handleBookmark(movies[currentIndex])}
           >
-            <FaInfoCircle className="text-white text-xl" />
+            <FaBookmark className="text-white text-xl" />
           </motion.button>
           
           <motion.button
@@ -357,19 +359,13 @@ export default function RecommendationSwiper({ movies, onLike, onDislike, onLoad
         </div>
       </div>
       
-      {/* Progress indicator */}
-      <div className="mt-6 flex justify-center">
-        <div className="flex space-x-1">
-          {movies.slice(0, Math.min(movies.length, 10)).map((_, idx) => (
-            <div
-              key={idx}
-              className={`w-2 h-2 rounded-full ${
-                idx === currentIndex % 10 ? 'bg-primary' : 'bg-gray-600'
-              }`}
-            />
-          ))}
-        </div>
-      </div>
+      {/* Movie Details Popup */}
+      {showDetails && (
+        <MovieDetailsPopup 
+          movie={selectedMovie}
+          onClose={handleCloseDetails}
+        />
+      )}
     </div>
   );
 }

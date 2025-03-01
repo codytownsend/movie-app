@@ -669,40 +669,49 @@ export default function MobileDiscoverPage() {
         {showSelectionScreen ? (
           <div className="min-h-[calc(100vh-200px)] flex flex-col">
             {selectionStep === 1 ? (
-              /* Initial Choice */
-              <div className="flex-grow flex flex-col pt-6 px-4">
-                <div className="mb-6">
-                  <h1 className="text-white text-2xl font-bold mb-2">Discover Movies</h1>
-                  <p className="text-gray-400 text-sm">What would you like to watch today?</p>
-                </div>
-                
-                <div className="space-y-3 max-w-sm">
-                  <motion.button
-                    whileTap={{ scale: 0.97 }}
-                    onClick={selectForYou}
-                    className="w-full bg-primary text-black p-4 rounded-xl transition-all transform hover:scale-[1.02] flex items-center shadow-md hover:shadow-lg"
-                  >
-                    <div className="text-2xl mr-3">👤</div>
-                    <div className="text-left">
-                      <div className="font-medium">For You</div>
-                      <div className="text-xs opacity-70">Based on your preferences</div>
-                    </div>
-                  </motion.button>
-                  
-                  <motion.button
-                    whileTap={{ scale: 0.97 }}
-                    onClick={goToMoodSelection}
-                    className="w-full bg-secondary hover:bg-secondary-light text-white p-4 rounded-xl transition-all transform hover:scale-[1.02] flex items-center shadow-md hover:shadow-lg"
-                  >
-                    <div className="text-2xl mr-3">🎭</div>
-                    <div className="text-left">
-                      <div className="font-medium">By Mood</div>
-                      <div className="text-xs opacity-70">Find movies for a specific mood</div>
-                    </div>
-                  </motion.button>
-                </div>
+            <div className="flex-grow flex flex-col items-center pt-6 px-4">
+              <div className="mb-6 text-center">
+                <h1 className="text-white text-2xl font-bold mb-2">Discover Movies</h1>
+                <p className="text-gray-400 text-sm">What would you like to watch today?</p>
               </div>
-            ) : selectionStep === 2 ? (
+              
+              <div className="w-full max-w-md space-y-6">
+                <motion.div
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={selectForYou}
+                  className="w-full bg-gradient-to-r from-primary to-accent p-6 rounded-2xl transition-all transform shadow-lg hover:shadow-glow-primary"
+                >
+                  <div className="flex items-center space-x-4">
+                    <div className="bg-white/20 backdrop-blur-sm p-4 rounded-full">
+                      <div className="text-3xl">👤</div>
+                    </div>
+                    <div className="flex-grow">
+                      <h2 className="text-xl font-bold text-black mb-1">For You</h2>
+                      <p className="text-black/80 text-sm">Personalized recommendations based on your preferences and viewing history</p>
+                    </div>
+                  </div>
+                </motion.div>
+                
+                <motion.div
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={goToMoodSelection}
+                  className="w-full bg-secondary hover:bg-secondary-light p-6 rounded-2xl transition-all transform shadow-lg"
+                >
+                  <div className="flex items-center space-x-4">
+                    <div className="bg-primary/20 backdrop-blur-sm p-4 rounded-full">
+                      <div className="text-3xl">🎭</div>
+                    </div>
+                    <div className="flex-grow">
+                      <h2 className="text-xl font-bold text-white mb-1">By Mood</h2>
+                      <p className="text-gray-300 text-sm">Find the perfect movie for your current mood or occasion</p>
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
+            </div>
+          ) : selectionStep === 2 ? (
               /* Mood Selection */
               <div className="flex-grow flex flex-col px-4 pt-4">
                 <div className="mb-6">
