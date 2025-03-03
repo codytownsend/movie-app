@@ -1,0 +1,227 @@
+/* src/styles/animations.css */
+
+/* Animation for card entrance */
+@keyframes card-entrance {
+    0% {
+        opacity: 0;
+        transform: scale(0.8) translateY(50px);
+    }
+
+    100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.card-entrance {
+    animation: card-entrance 0.4s cubic-bezier(0.21, 1.02, 0.73, 1) forwards;
+}
+
+/* Animation for swipe right */
+@keyframes swipe-right {
+    0% {
+        transform: translateX(0) rotate(0);
+    }
+
+    100% {
+        transform: translateX(150%) rotate(30deg);
+    }
+}
+
+.swipe-right {
+    animation: swipe-right 0.5s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+}
+
+/* Animation for swipe left */
+@keyframes swipe-left {
+    0% {
+        transform: translateX(0) rotate(0);
+    }
+
+    100% {
+        transform: translateX(-150%) rotate(-30deg);
+    }
+}
+
+.swipe-left {
+    animation: swipe-left 0.5s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+}
+
+/* Animation for a card returning to center */
+@keyframes return-center {
+    0% {
+        transform: translateX(var(--x-distance)) rotate(var(--rotation));
+    }
+
+    100% {
+        transform: translateX(0) rotate(0);
+    }
+}
+
+.return-center {
+    animation: return-center 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+/* Animation for fading in */
+@keyframes fade-in {
+    0% {
+        opacity: 0;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
+.fade-in {
+    animation: fade-in 0.3s ease forwards;
+}
+
+/* Animation for fading out */
+@keyframes fade-out {
+    0% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0;
+    }
+}
+
+.fade-out {
+    animation: fade-out 0.3s ease forwards;
+}
+
+/* Animation for sliding up */
+@keyframes slide-up {
+    0% {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+
+    100% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.slide-up {
+    animation: slide-up 0.3s ease forwards;
+}
+
+/* Animation for sliding down */
+@keyframes slide-down {
+    0% {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+
+    100% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.slide-down {
+    animation: slide-down 0.3s ease forwards;
+}
+
+/* Animation for page transitions */
+@keyframes page-transition-in {
+    0% {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.page-transition-in {
+    animation: page-transition-in 0.3s ease forwards;
+}
+
+/* Animation for toast notifications */
+@keyframes toast-in {
+    0% {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+
+    10% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+
+    90% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+}
+
+.toast-in {
+    animation: toast-in 3s ease forwards;
+}
+
+/* Animation for pulsing elements */
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.05);
+        opacity: 0.8;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.pulse {
+    animation: pulse 2s infinite ease-in-out;
+}
+
+/* Animation delay utility classes */
+.delay-100 {
+    animation-delay: 100ms;
+}
+
+.delay-200 {
+    animation-delay: 200ms;
+}
+
+.delay-300 {
+    animation-delay: 300ms;
+}
+
+.delay-500 {
+    animation-delay: 500ms;
+}
+
+/* Animation for like badge */
+@keyframes scale-in-center {
+    0% {
+        transform: scale(0);
+        opacity: 0;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.scale-in-center {
+    animation: scale-in-center 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}

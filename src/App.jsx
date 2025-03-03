@@ -1,75 +1,94 @@
-// src/App.js
-import React, { useState } from 'react';
+// src/App.jsx
+import React, { useState, useEffect } from 'react';
 import DiscoverPage from './pages/DiscoverPage';
 import SearchPage from './pages/SearchPage';
 import SocialPage from './pages/SocialPage';
 import WatchlistPage from './pages/WatchlistPage';
 import ProfilePage from './pages/ProfilePage';
-import { sampleUsers } from './data/sampleData';
+import LoadingScreen from './components/LoadingScreen';
+import Toast from './components/Toast';
+import { AppProvider, useAppContext } from './context/AppContext';
+import * as movieService from './services/movieService';
 
-function App() {
-  const [activeTab, setActiveTab] = useState('discover');
-  const [darkMode, setDarkMode] = useState(true);
-  const [watchlist, setWatchlist] = useState([]);
-  
-  // Define color scheme based on dark mode.
-  const colorScheme = {
-    bg: darkMode ? 'bg-gray-900' : 'bg-gray-50',
-    card: darkMode ? 'bg-gray-800' : 'bg-white',
-    text: darkMode ? 'text-gray-100' : 'text-gray-800',
-    textSecondary: darkMode ? 'text-gray-300' : 'text-gray-600',
-    border: darkMode ? 'border-gray-700' : 'border-gray-200',
-    accent: 'bg-gradient-to-r from-purple-500 to-pink-500'
+function AppContent() {
+  const { 
+    activeTab, 
+    isLoading, 
+    setIsLoading, 
+    toast, 
+    setMovies
+  } = useAppContext();
+
+  // Fetch initial movie data
+  useEffect(() => {
+    const fetchMovies = async () => {
+      setIsLoading(true);
+      try {
+        // For simplicity, we'll just use sample data for now
+        // In a real app, you'd use the API
+        const sampleMovies = await movieService.useSampleMovies();
+        
+        // Add mock streaming information if needed
+        const moviesWithStreaming = sampleMovies.map(movie => ({
+          ...movie,
+          streamingOn: movie.streamingOn || movieService.getStreamingServices(movie.id)
+        }));
+        
+        setMovies(moviesWithStreaming);
+      } catch (error) {
+        console.error("Error fetching initial movies:", error);
+        // Fallback to sample data
+        const sampleMovies = await movieService.useSampleMovies();
+        setMovies(sampleMovies);
+      } finally {
+        // Short timeout to allow UI to render smoothly
+        setTimeout(() => {
+          setIsLoading(false);
+        }, 500);
+      }
+    };
+
+    fetchMovies();
+  }, [setIsLoading, setMovies]);
+
+  // Show loading screen while fetching initial data
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
+
+  // Render the active tab/page
+  const renderActivePage = () => {
+    switch (activeTab) {
+      case 'discover':
+        return <DiscoverPage />;
+      case 'search':
+        return <SearchPage />;
+      case 'social':
+        return <SocialPage />;
+      case 'watchlist':
+        return <WatchlistPage />;
+      case 'profile':
+        return <ProfilePage />;
+      default:
+        return <DiscoverPage />;
+    }
   };
 
   return (
     <>
-      {activeTab === 'discover' && (
-        <DiscoverPage 
-          setActiveTab={setActiveTab} 
-          colorScheme={colorScheme} 
-          darkMode={darkMode} 
-          setDarkMode={setDarkMode}
-        />
-      )}
-      {activeTab === 'search' && (
-        <SearchPage 
-          setActiveTab={setActiveTab} 
-          colorScheme={colorScheme} 
-          darkMode={darkMode}
-        />
-      )}
-      {activeTab === 'social' && (
-        <SocialPage 
-          setActiveTab={setActiveTab} 
-          colorScheme={colorScheme} 
-          darkMode={darkMode}
-          showToast={(msg) => console.log(msg)}
-        />
-      )}
-      {activeTab === 'watchlist' && (
-        <WatchlistPage 
-          watchlist={watchlist} 
-          setWatchlist={setWatchlist} 
-          colorScheme={colorScheme} 
-          setActiveTab={setActiveTab}
-          showToast={(msg) => console.log(msg)}
-          pendingRecommendations={[]}
-          darkMode={darkMode}
-        />
-      )}
-      {activeTab === 'profile' && (
-        <ProfilePage 
-          currentUser={sampleUsers[0]} 
-          watchlist={watchlist} 
-          setWatchlist={setWatchlist} 
-          colorScheme={colorScheme} 
-          setActiveTab={setActiveTab}
-          darkMode={darkMode}
-          showToast={(msg) => console.log(msg)}
-        />
-      )}
+      {renderActivePage()}
+      
+      {/* Toast notification for app-wide messages */}
+      <Toast toast={toast} />
     </>
+  );
+}
+
+function App() {
+  return (
+    <AppProvider>
+      <AppContent />
+    </AppProvider>
   );
 }
 
