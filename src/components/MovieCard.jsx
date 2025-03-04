@@ -1,6 +1,6 @@
 // src/components/MovieCard.jsx
 import React, { useRef, useState, useEffect } from 'react';
-import { Info, Star, Calendar, Clock, Play } from 'lucide-react';
+import { Info, Star } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 
 const MovieCard = ({ 
@@ -8,13 +8,7 @@ const MovieCard = ({
   handleSwipe, 
   setShowDetails, 
   direction, 
-  setDirection, 
-  cardRef,
-  handleTouchStart,
-  handleTouchMove,
-  handleTouchEnd,
-  handleMouseDown,
-  animating
+  setDirection 
 }) => {
   const { 
     colorScheme, 
@@ -24,24 +18,234 @@ const MovieCard = ({
     showToast
   } = useAppContext();
   
+  const cardRef = useRef(null);
+  const initialTouchPosition = useRef(null);
+  const currentSwipeDistance = useRef(0);
+  const animationRef = useRef(null);
+  
   // Reset card position when movie changes
   useEffect(() => {
     if (cardRef.current) {
       cardRef.current.style.transform = 'translateX(0) rotate(0)';
+      cardRef.current.style.opacity = '1';
       setDirection('');
     }
-  }, [currentMovie, setDirection, cardRef]);
+    
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [currentMovie, setDirection]);
+
+  // Touch/swipe handling
+  const handleTouchStart = (e) => {
+    initialTouchPosition.current = e.touches[0].clientX;
+    
+    // Cancel any ongoing animation
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    if (!initialTouchPosition.current) return;
+    
+    const currentTouch = e.touches[0].clientX;
+    const diff = currentTouch - initialTouchPosition.current;
+    animateCard(diff);
+  };
+
+  const handleTouchEnd = () => {
+    if (!initialTouchPosition.current) return;
+    
+    const threshold = window.innerWidth * 0.2;
+    
+    if (currentSwipeDistance.current > threshold) {
+      // Complete the swipe right animation and call handler
+      animateCardAway('right', () => handleSwipeWithWatchlist(true));
+    } else if (currentSwipeDistance.current < -threshold) {
+      // Complete the swipe left animation and call handler
+      animateCardAway('left', () => handleSwipeWithWatchlist(false));
+    } else {
+      // Return card to center if not swiped far enough
+      animateCardReturn();
+    }
+    
+    initialTouchPosition.current = null;
+  };
+
+  // Mouse handling for desktop
+  const handleMouseDown = (e) => {
+    initialTouchPosition.current = e.clientX;
+    
+    // Add event listeners for mouse move and up
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    
+    // Cancel any ongoing animation
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+    }
+  };
+
+  const handleMouseMove = (e) => {
+    if (!initialTouchPosition.current) return;
+    
+    const diff = e.clientX - initialTouchPosition.current;
+    animateCard(diff);
+  };
+
+  const handleMouseUp = () => {
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', handleMouseUp);
+    
+    if (!initialTouchPosition.current) return;
+    
+    const threshold = window.innerWidth * 0.2;
+    
+    if (currentSwipeDistance.current > threshold) {
+      // Complete the swipe right animation and call handler
+      animateCardAway('right', () => handleSwipeWithWatchlist(true));
+    } else if (currentSwipeDistance.current < -threshold) {
+      // Complete the swipe left animation and call handler
+      animateCardAway('left', () => handleSwipeWithWatchlist(false));
+    } else {
+      // Return card to center if not swiped far enough
+      animateCardReturn();
+    }
+    
+    initialTouchPosition.current = null;
+  };
+  
+  // Add movie to watchlist when swiped right
+  const handleSwipeWithWatchlist = (liked) => {
+    if (liked && currentMovie) {
+      // Check if movie is already in watchlist
+      const alreadyInWatchlist = watchlist.some(movie => movie.id === currentMovie.id);
+      
+      if (!alreadyInWatchlist) {
+        // Add to watchlist
+        setWatchlist(prev => [...prev, currentMovie]);
+        showToast("Added to watchlist");
+      }
+    }
+    
+    // Call the original swipe handler
+    handleSwipe(liked);
+  };
+
+  // Animation functions
+  const animateCard = (diff) => {
+    const maxDistance = window.innerWidth * 0.5;
+    const limitedDiff = Math.max(Math.min(diff, maxDistance), -maxDistance);
+    
+    // Calculate rotation based on swipe distance - more natural feel
+    const rotate = (limitedDiff / 20) * Math.min(Math.abs(limitedDiff) / 100, 1);
+    
+    if (cardRef.current) {
+      cardRef.current.style.transform = `translateX(${limitedDiff}px) rotate(${rotate}deg)`;
+      
+      // Update the direction state for UI feedback
+      if (limitedDiff > 50) {
+        setDirection('right');
+      } else if (limitedDiff < -50) {
+        setDirection('left');
+      } else {
+        setDirection('');
+      }
+    }
+    
+    currentSwipeDistance.current = limitedDiff;
+  };
+
+  const animateCardAway = (direction, callback) => {
+    const targetX = direction === 'right' ? window.innerWidth * 1.5 : -window.innerWidth * 1.5;
+    const targetRotation = direction === 'right' ? 30 : -30;
+    const startX = currentSwipeDistance.current;
+    const startRotation = (startX / 20) * Math.min(Math.abs(startX) / 100, 1);
+    const startTime = performance.now();
+    const duration = 300; // Consistent 300ms for all animations
+    
+    setDirection(direction);
+    
+    const animateFrame = (timestamp) => {
+      const elapsed = timestamp - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const easeProgress = 1 - Math.pow(1 - progress, 3); // Cubic ease out
+      
+      const currentX = startX + (targetX - startX) * easeProgress;
+      const currentRotation = startRotation + (targetRotation - startRotation) * easeProgress;
+      const fadeOpacity = 1 - easeProgress; // Fade out as card moves away
+      
+      if (cardRef.current) {
+        cardRef.current.style.transform = `translateX(${currentX}px) rotate(${currentRotation}deg)`;
+        cardRef.current.style.opacity = fadeOpacity.toString();
+      }
+      
+      if (progress < 1) {
+        animationRef.current = requestAnimationFrame(animateFrame);
+      } else {
+        // Animation completed, call callback immediately
+        callback();
+      }
+    };
+    
+    animationRef.current = requestAnimationFrame(animateFrame);
+  };
+
+  const animateCardReturn = () => {
+    const startX = currentSwipeDistance.current;
+    const startRotation = (startX / 20) * Math.min(Math.abs(startX) / 100, 1);
+    const startTime = performance.now();
+    const duration = 300; // Consistent 300ms
+    
+    setDirection('');
+    
+    const animateFrame = (timestamp) => {
+      const elapsed = timestamp - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const easeProgress = 1 - Math.pow(1 - progress, 2); // Quadratic ease out
+      
+      const currentX = startX * (1 - easeProgress);
+      const currentRotation = startRotation * (1 - easeProgress);
+      
+      if (cardRef.current) {
+        cardRef.current.style.transform = `translateX(${currentX}px) rotate(${currentRotation}deg)`;
+        cardRef.current.style.opacity = '1'; // Ensure full opacity when returning
+      }
+      
+      if (progress < 1) {
+        animationRef.current = requestAnimationFrame(animateFrame);
+      } else {
+        // Reset when animation completes
+        currentSwipeDistance.current = 0;
+      }
+    };
+    
+    animationRef.current = requestAnimationFrame(animateFrame);
+  };
+
+  // Clean up animations on unmount
+  useEffect(() => {
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, []);
 
   if (!currentMovie) return null;
 
   return (
     <div 
       ref={cardRef}
-      className={`absolute w-[85%] max-w-sm ${colorScheme.card} rounded-xl shadow-xl overflow-hidden transform transition-shadow duration-300 cursor-grab active:cursor-grabbing ${animating ? 'pointer-events-none' : ''}`}
+      className={`absolute w-[90%] max-w-sm ${colorScheme.card} rounded-xl shadow-xl overflow-hidden transform transition-opacity duration-300 cursor-grab active:cursor-grabbing ${direction ? 'shadow-2xl' : ''}`}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       onMouseDown={handleMouseDown}
+      style={{ opacity: 1 }} // Set initial opacity
     >
       {/* Movie poster */}
       <div className="relative">
@@ -86,7 +290,7 @@ const MovieCard = ({
               {currentMovie.streamingOn?.map((platform, i) => (
                 <span 
                   key={i} 
-                  className="ml-1 text-xs bg-black bg-opacity-60 backdrop-blur-sm rounded-md px-2 py-1"
+                  className="ml-1 text-xs bg-gray-800 bg-opacity-80 rounded-md px-2 py-1"
                 >
                   {platform}
                 </span>
@@ -110,49 +314,36 @@ const MovieCard = ({
           <p className="mt-3 text-sm text-white line-clamp-2 leading-snug">
             {currentMovie.description}
           </p>
-          
-          {/* Play trailer button */}
-          <button 
-            onClick={(e) => {
-              e.stopPropagation();
-              showToast("Opening trailer...");
-            }}
-            className="mt-4 bg-white bg-opacity-20 hover:bg-opacity-30 backdrop-blur-sm rounded-lg px-4 py-1.5 text-white flex items-center w-fit transition-all"
-          >
-            <Play className="w-4 h-4 fill-current mr-1" />
-            <span className="text-xs font-medium">Watch Trailer</span>
-          </button>
         </div>
         
         {/* Details button */}
         <button 
-          onClick={(e) => {
-            e.stopPropagation();
-            setShowDetails(true);
-          }}
-          className="absolute top-4 right-4 bg-black bg-opacity-50 backdrop-blur-sm rounded-full p-2.5 text-white shadow-lg transform transition hover:scale-110 hover:bg-opacity-70"
+          onClick={() => setShowDetails(true)}
+          className="absolute top-4 right-4 bg-black bg-opacity-50 backdrop-blur-sm rounded-full p-2 text-white shadow-lg transform transition hover:scale-110"
         >
           <Info className="w-5 h-5" />
         </button>
       </div>
       
       {/* Custom animation styles */}
-      <style jsx>{`
-        .scale-in-center {
-          animation: scale-in-center 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
-        }
-        
-        @keyframes scale-in-center {
-          0% {
-            transform: scale(0);
-            opacity: 0;
+      <style>
+        {`
+          .scale-in-center {
+            animation: scale-in-center 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
           }
-          100% {
-            transform: scale(1) rotate(${direction === 'right' ? '-12deg' : '12deg'});
-            opacity: 1;
+          
+          @keyframes scale-in-center {
+            0% {
+              transform: scale(0);
+              opacity: 0;
+            }
+            100% {
+              transform: scale(1) rotate(${direction === 'right' ? '-12deg' : '12deg'});
+              opacity: 1;
+            }
           }
-        }
-      `}</style>
+        `}
+      </style>
     </div>
   );
 };

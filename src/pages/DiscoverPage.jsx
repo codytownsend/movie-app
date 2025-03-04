@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Heart, Info, Play, Star, Bookmark } from 'lucide-react';
+import { X, Heart, Info, Star, Bookmark } from 'lucide-react';
 import Header from '../components/Header';
 import BottomNavigation from '../components/BottomNavigation';
 import FilterModal from '../modals/FilterModal';
 import NotificationsModal from '../modals/NotificationsModal';
 import MovieDetailsModal from '../modals/MovieDetailsModal';
+import SwipeGuideAnimation from '../components/SwipeGuideAnimation';
 import { useAppContext } from '../context/AppContext';
 
 const DiscoverPage = () => {
@@ -30,7 +31,6 @@ const DiscoverPage = () => {
   const [pullDown, setPullDown] = useState(0);
   const [isPulling, setIsPulling] = useState(false);
   const [showInstructions, setShowInstructions] = useState(true);
-  const [currentInstruction, setCurrentInstruction] = useState('swipe-right');
   
   const currentMovie = movies[currentIndex];
   const cardRef = useRef(null);
@@ -39,33 +39,6 @@ const DiscoverPage = () => {
   const animationRef = useRef(null);
   const swipeThreshold = window.innerWidth * 0.25;
   const pullThreshold = 80; // Pixels needed to pull down to add to watchlist
-
-  // Instruction animation sequence
-  useEffect(() => {
-    if (!showInstructions) return;
-    
-    const instructionSequence = ['swipe-right', 'swipe-left', 'pull-down'];
-    let currentIndex = 0;
-    
-    const rotateInstructions = () => {
-      setCurrentInstruction(instructionSequence[currentIndex]);
-      currentIndex = (currentIndex + 1) % instructionSequence.length;
-    };
-    
-    // First instruction is already set, so start the sequence
-    // Change instruction every 2.5 seconds (quicker, more concise animations)
-    const instructionTimer = setInterval(rotateInstructions, 2500);
-    
-    // Auto-hide instructions after 8 seconds (faster total instruction time)
-    const hideTimer = setTimeout(() => {
-      setShowInstructions(false);
-    }, 8000);
-    
-    return () => {
-      clearInterval(instructionTimer);
-      clearTimeout(hideTimer);
-    };
-  }, [showInstructions]);
 
   // Check localStorage for first visit
   useEffect(() => {
@@ -411,7 +384,7 @@ const DiscoverPage = () => {
               </div>
             )}
             
-              {/* Card stack effect - showing next card behind - full screen version */}
+            {/* Card stack effect - showing next card behind - full screen version */}
             {currentIndex + 1 < movies.length && direction === '' && !isPulling && (
               <div className={`absolute inset-0 ${colorScheme.card} overflow-hidden transform scale-95 opacity-70`}>
                 <img 
@@ -540,85 +513,9 @@ const DiscoverPage = () => {
       {/* Bottom Tab Navigation */}
       <BottomNavigation />
       
-      {/* Animated Instructions Overlay */}
+      {/* Swipe Guide Animation Overlay */}
       {currentMovie && showInstructions && (
-        <div className="fixed inset-0 z-30 pointer-events-none flex items-start pt-20 justify-center">
-          <div className="absolute inset-0 bg-black bg-opacity-70"></div>
-          
-          {/* Swipe Right Animation */}
-          {currentInstruction === 'swipe-right' && (
-            <div className="relative w-full flex flex-col items-center animate-fade-in px-4">
-              <div className="w-16 h-16 rounded-full bg-white bg-opacity-20 mb-4 flex items-center justify-center">
-                <Heart className="w-8 h-8 text-pink-500" />
-              </div>
-              <div className="text-white text-center font-medium mb-2">Swipe Right</div>
-              <div className="text-white text-center text-sm opacity-80 mb-6">to like a movie</div>
-              
-              {/* Interactive demo */}
-              <div className="relative w-64 h-80 bg-purple-500 bg-opacity-20 border-2 border-white rounded-xl flex justify-center items-center animate-swipe-right-card">
-                {/* Hand with swipe animation */}
-                <div className="absolute -right-16 w-12 h-20 border-2 border-white rounded-3xl animate-swipe-right-hand">
-                  <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-3 h-3 bg-white rounded-full"></div>
-                </div>
-                
-                {/* Arrow animation */}
-                <div className="w-16 h-16 border-r-4 border-t-4 border-white transform rotate-45 animate-right-arrow-pulse"></div>
-              </div>
-            </div>
-          )}
-          
-          {/* Swipe Left Animation */}
-          {currentInstruction === 'swipe-left' && (
-            <div className="relative w-full flex flex-col items-center animate-fade-in px-4">
-              <div className="w-16 h-16 rounded-full bg-white bg-opacity-20 mb-4 flex items-center justify-center">
-                <X className="w-8 h-8 text-red-500" />
-              </div>
-              <div className="text-white text-center font-medium mb-2">Swipe Left</div>
-              <div className="text-white text-center text-sm opacity-80 mb-6">to skip a movie</div>
-              
-              {/* Interactive demo */}
-              <div className="relative w-64 h-80 bg-red-500 bg-opacity-20 border-2 border-white rounded-xl flex justify-center items-center animate-swipe-left-card">
-                {/* Hand with swipe animation */}
-                <div className="absolute -left-16 w-12 h-20 border-2 border-white rounded-3xl animate-swipe-left-hand">
-                  <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-3 h-3 bg-white rounded-full"></div>
-                </div>
-                
-                {/* Arrow animation */}
-                <div className="w-16 h-16 border-l-4 border-t-4 border-white transform -rotate-45 animate-left-arrow-pulse"></div>
-              </div>
-            </div>
-          )}
-          
-          {/* Pull Down Animation */}
-          {currentInstruction === 'pull-down' && (
-            <div className="relative w-full flex flex-col items-center animate-fade-in px-4">
-              <div className="w-16 h-16 rounded-full bg-white bg-opacity-20 mb-4 flex items-center justify-center">
-                <Bookmark className="w-8 h-8 text-yellow-500" />
-              </div>
-              <div className="text-white text-center font-medium mb-2">Pull Down</div>
-              <div className="text-white text-center text-sm opacity-80 mb-6">to add to watchlist</div>
-              
-              {/* Interactive demo */}
-              <div className="relative w-64 h-80 bg-yellow-500 bg-opacity-20 border-2 border-white rounded-xl flex justify-center items-center animate-pull-card">
-                {/* Hand with pull animation */}
-                <div className="absolute -top-24 w-12 h-20 border-2 border-white rounded-3xl animate-pull-hand">
-                  <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-3 h-3 bg-white rounded-full"></div>
-                </div>
-                
-                {/* Arrow animation */}
-                <div className="w-16 h-16 border-b-4 border-r-4 border-l-4 border-white rounded-b-xl animate-down-arrow-pulse"></div>
-              </div>
-            </div>
-          )}
-          
-          {/* Skip button */}
-          <button 
-            className="absolute bottom-40 bg-white bg-opacity-30 text-white px-5 py-2 rounded-full pointer-events-auto"
-            onClick={() => setShowInstructions(false)}
-          >
-            Got it
-          </button>
-        </div>
+        <SwipeGuideAnimation onComplete={() => setShowInstructions(false)} />
       )}
       
       {/* Modals */}
@@ -641,7 +538,7 @@ const DiscoverPage = () => {
         />
       )}
       
-      {/* Custom animations */}
+      {/* Custom animations styles (preserved for other animations) */}
       <style jsx>{`
         @keyframes scale-in {
           0% {
@@ -656,115 +553,6 @@ const DiscoverPage = () => {
 
         .animate-scale-in {
           animation: scale-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-        }
-
-        /* Instruction animations */
-        @keyframes fade-in {
-          0% { opacity: 0; }
-          100% { opacity: 1; }
-        }
-        
-        @keyframes swipe-right-card {
-          0% { transform: translateX(0) rotate(0); }
-          40% { transform: translateX(100px) rotate(15deg); }
-          100% { transform: translateX(0) rotate(0); }
-        }
-        
-        @keyframes swipe-left-card {
-          0% { transform: translateX(0) rotate(0); }
-          40% { transform: translateX(-100px) rotate(-15deg); }
-          100% { transform: translateX(0) rotate(0); }
-        }
-        
-        @keyframes swipe-right-hand {
-          0% { opacity: 0; transform: translateX(-40px); }
-          15% { opacity: 1; transform: translateX(-40px); }
-          65% { opacity: 1; transform: translateX(50px); }
-          100% { opacity: 0; transform: translateX(50px); }
-        }
-        
-        @keyframes swipe-left-hand {
-          0% { opacity: 0; transform: translateX(40px); }
-          15% { opacity: 1; transform: translateX(40px); }
-          65% { opacity: 1; transform: translateX(-50px); }
-          100% { opacity: 0; transform: translateX(-50px); }
-        }
-        
-        @keyframes pull-card {
-          0% { transform: translateY(0); }
-          40% { transform: translateY(80px); }
-          100% { transform: translateY(0); }
-        }
-        
-        @keyframes pull-hand {
-          0% { opacity: 0; transform: translateY(0); }
-          15% { opacity: 1; transform: translateY(0); }
-          65% { opacity: 1; transform: translateY(80px); }
-          100% { opacity: 0; transform: translateY(80px); }
-        }
-        
-        @keyframes right-arrow-pulse {
-          0% { opacity: 0.5; transform: rotate(45deg) scale(0.9); }
-          50% { opacity: 1; transform: rotate(45deg) scale(1.1); }
-          100% { opacity: 0.5; transform: rotate(45deg) scale(0.9); }
-        }
-        
-        @keyframes left-arrow-pulse {
-          0% { opacity: 0.5; transform: rotate(-45deg) scale(0.9); }
-          50% { opacity: 1; transform: rotate(-45deg) scale(1.1); }
-          100% { opacity: 0.5; transform: rotate(-45deg) scale(0.9); }
-        }
-        
-        @keyframes down-arrow-pulse {
-          0% { opacity: 0.5; transform: translateY(0) scale(0.9); }
-          50% { opacity: 1; transform: translateY(10px) scale(1.1); }
-          100% { opacity: 0.5; transform: translateY(0) scale(0.9); }
-        }
-        
-        .animate-fade-in {
-          animation: fade-in 0.5s ease forwards;
-        }
-        
-        .animate-swipe-right-card {
-          animation: swipe-right-card 2.2s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
-          animation-iteration-count: 1;
-        }
-        
-        .animate-swipe-left-card {
-          animation: swipe-left-card 2.2s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
-          animation-iteration-count: 1;
-        }
-        
-        .animate-swipe-right-hand {
-          animation: swipe-right-hand 2.2s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
-          animation-iteration-count: 1;
-        }
-        
-        .animate-swipe-left-hand {
-          animation: swipe-left-hand 2.2s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
-          animation-iteration-count: 1;
-        }
-        
-        .animate-pull-card {
-          animation: pull-card 2.2s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
-          animation-iteration-count: 1;
-        }
-        
-        .animate-pull-hand {
-          animation: pull-hand 2.2s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
-          animation-iteration-count: 1;
-        }
-        
-        .animate-right-arrow-pulse {
-          animation: right-arrow-pulse 1.5s ease-in-out infinite;
-        }
-        
-        .animate-left-arrow-pulse {
-          animation: left-arrow-pulse 1.5s ease-in-out infinite;
-        }
-        
-        .animate-down-arrow-pulse {
-          animation: down-arrow-pulse 1.5s ease-in-out infinite;
         }
       `}</style>
     </div>
