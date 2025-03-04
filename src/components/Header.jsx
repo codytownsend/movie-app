@@ -3,13 +3,26 @@ import React from 'react';
 import { Sliders, Bell } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 
-const Header = ({ setNotificationsOpen }) => {
+const Header = ({ setFilterOpen, setNotificationsOpen }) => {
   const { 
     colorScheme, 
     pendingRecommendations,
-    activeTab,
-    setFilterOpen
+    activeTab
   } = useAppContext();
+
+  // Handle notifications click
+  const handleNotificationsClick = () => {
+    if (setNotificationsOpen && typeof setNotificationsOpen === 'function') {
+      setNotificationsOpen(true);
+    }
+  };
+
+  // Handle filters click
+  const handleFiltersClick = () => {
+    if (setFilterOpen && typeof setFilterOpen === 'function') {
+      setFilterOpen(true);
+    }
+  };
 
   return (
     <header className={`${colorScheme.card} shadow-sm p-4 flex justify-between items-center z-10`}>
@@ -17,7 +30,7 @@ const Header = ({ setNotificationsOpen }) => {
       {activeTab === 'discover' && (
         <div 
           className={`flex items-center cursor-pointer transform transition hover:scale-105`}
-          onClick={() => setFilterOpen(true)}
+          onClick={handleFiltersClick}
         >
           <div className={`w-10 h-10 rounded-full flex items-center justify-center ${colorScheme.bg}`}>
             <Sliders className={`w-5 h-5 ${colorScheme.text}`} />
@@ -38,7 +51,7 @@ const Header = ({ setNotificationsOpen }) => {
       {/* Notifications button - shown on all pages */}
       <div 
         className={`w-10 h-10 rounded-full flex items-center justify-center ${colorScheme.bg} cursor-pointer relative transform transition hover:scale-105`}
-        onClick={() => setNotificationsOpen(true)}
+        onClick={handleNotificationsClick}
       >
         <Bell className={`w-5 h-5 ${colorScheme.text}`} />
         {pendingRecommendations?.length > 0 && (

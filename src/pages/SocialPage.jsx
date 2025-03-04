@@ -1,10 +1,11 @@
 // src/pages/SocialPage.jsx
 import React, { useState, useEffect } from 'react';
-import { Star, ThumbsUp, MessageCircle, Bookmark } from 'lucide-react';
+import { Star, ThumbsUp, MessageCircle, Bookmark, Film, Users, User, UserPlus, Search } from 'lucide-react';
 import Header from '../components/Header';
 import BottomNavigation from '../components/BottomNavigation';
 import { useAppContext } from '../context/AppContext';
 import { sampleUsers, friendRecommendations } from '../data/sampleData';
+import NotificationsModal from '../modals/NotificationsModal';
 
 const SocialPage = () => {
   const { 
@@ -12,13 +13,16 @@ const SocialPage = () => {
     darkMode, 
     showToast, 
     movies, 
-    setActiveTab,
+    setActiveTab, 
     setWatchlist,
     watchlist
   } = useAppContext();
   
+  // Local state
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [activityFeed, setActivityFeed] = useState([]);
+  const [socialTabView, setSocialTabView] = useState('recommendations');
+  const [friendSearchQuery, setFriendSearchQuery] = useState('');
   
   // Setup activity feed
   useEffect(() => {
@@ -74,21 +78,55 @@ const SocialPage = () => {
     }
   };
 
+  // Filter friends based on search query
+  const filteredFriends = friendSearchQuery 
+    ? sampleUsers.slice(1).filter(friend => 
+        friend.name.toLowerCase().includes(friendSearchQuery.toLowerCase()) ||
+        friend.username.toLowerCase().includes(friendSearchQuery.toLowerCase())
+      )
+    : sampleUsers.slice(1);
+
   return (
     <div className={`min-h-screen ${colorScheme.bg} flex flex-col max-w-md mx-auto overflow-hidden`}>
       <Header 
         setNotificationsOpen={setNotificationsOpen}
       />
       
+      {/* Page Title */}
       <div className="p-4 pb-2 flex items-center">
-        <h2 className={`text-xl font-bold ${colorScheme.text}`}>Social Feed</h2>
+        <h2 className={`text-xl font-bold ${colorScheme.text}`}>Social</h2>
       </div>
       
+      {/* Tab Navigation */}
+      <div className={`px-4 ${colorScheme.card}`}>
+        <div className="flex border-b border-gray-200 dark:border-gray-700">
+          <TabButton 
+            label="Recommendations" 
+            isActive={socialTabView === 'recommendations'} 
+            onClick={() => setSocialTabView('recommendations')}
+            colorScheme={colorScheme}
+            badge={friendRecommendations.length > 0}
+          />
+          <TabButton 
+            label="Reviews" 
+            isActive={socialTabView === 'reviews'} 
+            onClick={() => setSocialTabView('reviews')}
+            colorScheme={colorScheme}
+          />
+          <TabButton 
+            label="Friends" 
+            isActive={socialTabView === 'friends'} 
+            onClick={() => setSocialTabView('friends')}
+            colorScheme={colorScheme}
+          />
+        </div>
+      </div>
+      
+      {/* Main Content Area */}
       <div className="flex-1 p-4 overflow-y-auto pb-20">
-        {/* Friend Recommendations */}
-        {friendRecommendations.length > 0 && (
-          <div className="mb-6">
-            <h3 className={`font-medium mb-3 ${colorScheme.text}`}>Recommendations from Friends</h3>
+        {/* Recommendations Tab */}
+        {socialTabView === 'recommendations' && (
+          friendRecommendations.length > 0 ? (
             <div className="space-y-4">
               {friendRecommendations.map((rec, index) => {
                 const friend = sampleUsers.find(user => user.id === rec.userId);
@@ -164,61 +202,66 @@ const SocialPage = () => {
                 );
               })}
             </div>
-          </div>
+          ) : (
+            <div className={`flex flex-col items-center justify-center h-64 text-center ${colorScheme.textSecondary}`}>
+              <div className="w-16 h-16 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center mb-4">
+                <Film className="w-8 h-8 text-gray-400" />
+              </div>
+              <p className="mb-2">No recommendations yet</p>
+              <p className="text-sm max-w-xs">
+                Your friends haven't sent you any movie recommendations yet
+              </p>
+            </div>
+          )
         )}
         
-        {/* Activity Feed */}
-        <div>
-          <h3 className={`font-medium mb-3 ${colorScheme.text}`}>Activity Feed</h3>
-          <div className="space-y-4">
-            {activityFeed.map((activity, index) => {
-              const movie = findMovieById(activity.movieId);
-              if (!movie) return null;
-              
-              return (
-                <div key={index} className={`${colorScheme.card} rounded-lg p-4 shadow`}>
-                  <div className="flex items-start">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white mr-3 flex-shrink-0">
-                      <span>{activity.userAvatar}</span>
-                    </div>
-                    
-                    <div className="flex-1">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <p className={`font-medium ${colorScheme.text}`}>
-                            {activity.userName}
-                            <span className={`font-normal ${colorScheme.textSecondary}`}>
-                              {activity.type === 'liked' && ' liked'}
-                              {activity.type === 'added' && ' added to watchlist'}
-                              {activity.type === 'reviewed' && ' reviewed'}
-                            </span>
-                          </p>
-                        </div>
-                        <span className={`text-xs ${colorScheme.textSecondary}`}>
-                          {formatTimeElapsed(activity.timestamp)}
-                        </span>
+        {/* Reviews Tab */}
+        {socialTabView === 'reviews' && (
+          <div>
+            <div className="space-y-4">
+              {activityFeed.filter(activity => activity.type === 'reviewed').map((activity, index) => {
+                const movie = findMovieById(activity.movieId);
+                if (!movie) return null;
+                
+                return (
+                  <div key={index} className={`${colorScheme.card} rounded-lg p-4 shadow`}>
+                    <div className="flex items-start">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white mr-3 flex-shrink-0">
+                        <span>{activity.userAvatar}</span>
                       </div>
                       
-                      <div 
-                        className={`mt-2 flex rounded-lg overflow-hidden ${darkMode ? 'bg-gray-800' : 'bg-gray-100'} cursor-pointer`}
-                        onClick={() => {
-                          setActiveTab('discover');
-                          showToast(`Selected: ${movie.title}`);
-                        }}
-                      >
-                        <div className="w-16 h-20 bg-gray-300 flex-shrink-0">
-                          <img src={movie.posterUrl} alt={movie.title} className="w-full h-full object-cover" />
-                        </div>
-                        <div className="p-2">
-                          <h4 className={`font-medium text-sm ${colorScheme.text}`}>{movie.title}</h4>
-                          <div className="flex items-center">
-                            <Star className="w-3 h-3 text-yellow-400 fill-current" />
-                            <span className={`text-xs ml-1 ${colorScheme.textSecondary}`}>{movie.rating}</span>
-                            <span className="mx-1">•</span>
-                            <span className={`text-xs ${colorScheme.textSecondary}`}>{movie.year}</span>
+                      <div className="flex-1">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className={`font-medium ${colorScheme.text}`}>
+                              {activity.userName}
+                              <span className={`font-normal ${colorScheme.textSecondary}`}> reviewed</span>
+                            </p>
                           </div>
-                          
-                          {activity.type === 'reviewed' && activity.comment && (
+                          <span className={`text-xs ${colorScheme.textSecondary}`}>
+                            {formatTimeElapsed(activity.timestamp)}
+                          </span>
+                        </div>
+                        
+                        <div 
+                          className={`mt-2 flex rounded-lg overflow-hidden ${darkMode ? 'bg-gray-800' : 'bg-gray-100'} cursor-pointer`}
+                          onClick={() => {
+                            setActiveTab('discover');
+                            showToast(`Selected: ${movie.title}`);
+                          }}
+                        >
+                          <div className="w-16 h-20 bg-gray-300 flex-shrink-0">
+                            <img src={movie.posterUrl} alt={movie.title} className="w-full h-full object-cover" />
+                          </div>
+                          <div className="p-2">
+                            <h4 className={`font-medium text-sm ${colorScheme.text}`}>{movie.title}</h4>
+                            <div className="flex items-center">
+                              <Star className="w-3 h-3 text-yellow-400 fill-current" />
+                              <span className={`text-xs ml-1 ${colorScheme.textSecondary}`}>{movie.rating}</span>
+                              <span className="mx-1">•</span>
+                              <span className={`text-xs ${colorScheme.textSecondary}`}>{movie.year}</span>
+                            </div>
+                            
                             <div className="mt-1">
                               <div className="flex">
                                 {Array.from({ length: 5 }).map((_, i) => (
@@ -230,45 +273,168 @@ const SocialPage = () => {
                               </div>
                               <p className={`text-xs mt-1 ${colorScheme.text} italic`}>"{activity.comment}"</p>
                             </div>
-                          )}
+                          </div>
                         </div>
-                      </div>
-                      
-                      <div className="flex mt-3">
-                        <button 
-                          className={`flex items-center mr-4 ${colorScheme.textSecondary} text-xs`}
-                          onClick={() => showToast("Liked!")}
-                        >
-                          <ThumbsUp className="w-4 h-4 mr-1" />
-                          Like
-                        </button>
-                        <button 
-                          className={`flex items-center mr-4 ${colorScheme.textSecondary} text-xs`}
-                          onClick={() => showToast("Shared!")}
-                        >
-                          <MessageCircle className="w-4 h-4 mr-1" />
-                          Comment
-                        </button>
-                        <button 
-                          className={`flex items-center ${colorScheme.textSecondary} text-xs`}
-                          onClick={() => addToWatchlist(movie)}
-                        >
-                          <Bookmark className="w-4 h-4 mr-1" />
-                          Save
-                        </button>
+                        
+                        <div className="flex mt-3">
+                          <button 
+                            className={`flex items-center mr-4 ${colorScheme.textSecondary} text-xs`}
+                            onClick={() => showToast("Liked!")}
+                          >
+                            <ThumbsUp className="w-4 h-4 mr-1" />
+                            Like
+                          </button>
+                          <button 
+                            className={`flex items-center mr-4 ${colorScheme.textSecondary} text-xs`}
+                            onClick={() => showToast("Commenting...")}
+                          >
+                            <MessageCircle className="w-4 h-4 mr-1" />
+                            Comment
+                          </button>
+                          <button 
+                            className={`flex items-center ${colorScheme.textSecondary} text-xs`}
+                            onClick={() => addToWatchlist(movie)}
+                          >
+                            <Bookmark className="w-4 h-4 mr-1" />
+                            Save
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
+        
+        {/* Friends Tab - Enhanced with search */}
+        {socialTabView === 'friends' && (
+          <div>
+            {/* Search Friends Input */}
+            <div className={`${colorScheme.card} p-3 rounded-full mb-4 flex items-center shadow`}>
+              <Search className={`w-5 h-5 ${colorScheme.textSecondary} mr-2`} />
+              <input
+                type="text"
+                placeholder="Search for friends..."
+                className={`w-full bg-transparent focus:outline-none ${colorScheme.text}`}
+                value={friendSearchQuery}
+                onChange={(e) => setFriendSearchQuery(e.target.value)}
+              />
+              {friendSearchQuery && (
+                <button 
+                  className={`${colorScheme.textSecondary} ml-2`}
+                  onClick={() => setFriendSearchQuery('')}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+            
+            {/* Add Friends Button */}
+            <button 
+              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg py-3 mb-6 flex items-center justify-center"
+              onClick={() => showToast("Find friends feature coming soon!")}
+            >
+              <UserPlus className="w-5 h-5 mr-2" />
+              Find New Friends
+            </button>
+            
+            {/* Friend Suggestions */}
+            <h3 className={`font-medium mb-3 ${colorScheme.text}`}>Suggested Friends</h3>
+            <div className="space-y-3 mb-6">
+              {[
+                { id: 5, name: "Jane Smith", avatar: "J", mutualCount: 3 },
+                { id: 6, name: "Tom Wilson", avatar: "T", mutualCount: 2 },
+                { id: 7, name: "Ryan Lee", avatar: "R", mutualCount: 4 }
+              ]
+              .filter(suggestion => 
+                friendSearchQuery === '' || 
+                suggestion.name.toLowerCase().includes(friendSearchQuery.toLowerCase())
+              )
+              .map(suggestion => (
+                <div key={suggestion.id} className={`${colorScheme.card} rounded-lg p-4 shadow flex items-center`}>
+                  <div className="w-12 h-12 rounded-full bg-gray-300 flex items-center justify-center mr-3">
+                    <span className="text-lg text-gray-600">{suggestion.avatar}</span>
+                  </div>
+                  <div className="flex-1">
+                    <h4 className={`font-medium ${colorScheme.text}`}>{suggestion.name}</h4>
+                    <p className={`text-xs ${colorScheme.textSecondary}`}>{suggestion.mutualCount} mutual friends</p>
+                  </div>
+                  <button 
+                    className="bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full px-3 py-1 text-sm"
+                    onClick={() => showToast(`Friend request sent to ${suggestion.name}!`)}
+                  >
+                    Follow
+                  </button>
+                </div>
+              ))}
+            </div>
+            
+            {/* Your Friends */}
+            <h3 className={`font-medium mb-3 ${colorScheme.text}`}>Your Friends</h3>
+            <div className="space-y-3">
+              {filteredFriends.length > 0 ? (
+                filteredFriends.map(friend => (
+                  <div 
+                    key={friend.id} 
+                    className={`${colorScheme.card} rounded-lg p-4 shadow flex items-center`}
+                  >
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white mr-3">
+                      <span className="text-lg">{friend.avatar}</span>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className={`font-medium ${colorScheme.text}`}>{friend.name}</h4>
+                      <p className={`text-xs ${colorScheme.textSecondary}`}>@{friend.username}</p>
+                    </div>
+                    <div className="flex">
+                      <button 
+                        className={`${colorScheme.card} rounded-full p-2 shadow-md mr-2`}
+                        onClick={() => showToast(`Viewing ${friend.name}'s profile`)}
+                      >
+                        <User className="w-5 h-5 text-blue-500" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className={`text-center py-8 ${colorScheme.textSecondary}`}>
+                  <p>No friends found matching "{friendSearchQuery}"</p>
+                  <p className="text-sm mt-1">Try a different search term</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
       
       <BottomNavigation />
+      
+      {/* Notifications Modal */}
+      {notificationsOpen && (
+        <NotificationsModal 
+          setNotificationsOpen={setNotificationsOpen}
+        />
+      )}
     </div>
   );
 };
+
+// Tab Button Component
+const TabButton = ({ label, isActive, onClick, colorScheme, badge = false }) => (
+  <button
+    className={`flex-1 py-2 text-center relative ${
+      isActive 
+        ? `text-purple-500 border-b-2 border-purple-500 font-medium` 
+        : colorScheme.textSecondary
+    }`}
+    onClick={onClick}
+  >
+    {label}
+    {badge && (
+      <span className="absolute top-1 right-1/4 w-2 h-2 bg-red-500 rounded-full"></span>
+    )}
+  </button>
+);
 
 export default SocialPage;

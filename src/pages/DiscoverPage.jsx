@@ -7,7 +7,6 @@ import SwipeActions from '../components/SwipeActions';
 import MovieDetailsModal from '../modals/MovieDetailsModal';
 import FilterModal from '../modals/FilterModal';
 import NotificationsModal from '../modals/NotificationsModal';
-import SettingsModal from '../modals/SettingsModal';
 import { useAppContext } from '../context/AppContext';
 
 const DiscoverPage = () => {
@@ -15,31 +14,55 @@ const DiscoverPage = () => {
   const { 
     movies, 
     currentIndex, 
+    setCurrentIndex,
     colorScheme, 
     darkMode, 
     showToast, 
     handleSwipe,
     isLoading,
-    setIsLoading
+    setIsLoading,
+    watchlist,
+    setWatchlist
   } = useAppContext();
   
   // Local state
   const [showDetails, setShowDetails] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [direction, setDirection] = useState('');
   
   const currentMovie = movies[currentIndex];
 
-  // Handle refresh
+  // Handle refresh - getting new movie recommendations
   const handleRefresh = async () => {
     setIsLoading(true);
     // In a real app, this would fetch new recommendations
     setTimeout(() => {
       setIsLoading(false);
+      setCurrentIndex(0); // Reset to first movie
       showToast("New recommendations loaded!");
     }, 1500);
+  };
+
+  // Handle swipe functions
+  const handleSwipeNegative = () => {
+    setDirection('left');
+    setTimeout(() => {
+      handleSwipe(false);
+      setDirection('');
+    }, 300);
+  };
+
+  const handleSwipePositive = () => {
+    setDirection('right');
+    setTimeout(() => {
+      // Add to watchlist
+      if (currentMovie && !watchlist.find(m => m.id === currentMovie.id)) {
+        setWatchlist([...watchlist, currentMovie]);
+      }
+      handleSwipe(true);
+      setDirection('');
+    }, 300);
   };
 
   if (isLoading) {
@@ -91,9 +114,6 @@ const DiscoverPage = () => {
               currentMovie={currentMovie}
               handleSwipe={handleSwipe}
               setShowDetails={setShowDetails}
-              colorScheme={colorScheme}
-              showToast={showToast}
-              darkMode={darkMode}
               direction={direction}
               setDirection={setDirection}
             />
@@ -102,26 +122,9 @@ const DiscoverPage = () => {
 
         {/* Swipe action buttons */}
         <SwipeActions 
-          onSwipeNegative={() => {
-            setDirection('left');
-            setTimeout(() => {
-              handleSwipe(false);
-              setDirection('');
-            }, 300);
-          }}
-          onBookmark={() => {
-            if (currentMovie) {
-              showToast("Added to watchlist!");
-            }
-          }}
-          onSwipePositive={() => {
-            setDirection('right');
-            setTimeout(() => {
-              handleSwipe(true);
-              setDirection('');
-            }, 300);
-          }}
-          colorScheme={colorScheme}
+          onSwipeNegative={handleSwipeNegative}
+          onSwipePositive={handleSwipePositive}
+          currentMovie={currentMovie}
         />
       </div>
 
@@ -145,12 +148,6 @@ const DiscoverPage = () => {
       {notificationsOpen && (
         <NotificationsModal 
           setNotificationsOpen={setNotificationsOpen}
-        />
-      )}
-      
-      {showSettingsModal && (
-        <SettingsModal 
-          setShowSettingsModal={setShowSettingsModal}
         />
       )}
     </div>

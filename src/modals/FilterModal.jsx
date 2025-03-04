@@ -1,8 +1,27 @@
-// src/modals/FilterModal.js
+// src/modals/FilterModal.jsx
 import React from 'react';
 import { X } from 'lucide-react';
+import { useAppContext } from '../context/AppContext';
 
-const FilterModal = ({ colorScheme, setFilterOpen, filterPreferences, toggleGenreFilter, toggleServiceFilter, setYearRangeFilter, setRatingFilter, applyFilters, darkMode }) => {
+const FilterModal = ({ setFilterOpen }) => {
+  const { 
+    colorScheme, 
+    darkMode, 
+    filterPreferences, 
+    toggleGenreFilter,
+    toggleServiceFilter, 
+    setYearRangeFilter, 
+    setRatingFilter, 
+    applyFilters 
+  } = useAppContext();
+
+  // Handle filter reset
+  const handleResetFilters = () => {
+    // Reset filters logic would be in the context
+    // For now, just show that we would reset and close the modal
+    setFilterOpen(false);
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center" onClick={() => setFilterOpen(false)}>
       <div 
@@ -16,6 +35,7 @@ const FilterModal = ({ colorScheme, setFilterOpen, filterPreferences, toggleGenr
               <X className={`w-6 h-6 ${colorScheme.text}`} />
             </button>
           </div>
+          
           <div className="mb-5">
             <h3 className={`font-medium mb-3 ${colorScheme.text}`}>Genres</h3>
             <div className="flex flex-wrap">
@@ -42,6 +62,7 @@ const FilterModal = ({ colorScheme, setFilterOpen, filterPreferences, toggleGenr
               ))}
             </div>
           </div>
+          
           <div className="mb-5">
             <h3 className={`font-medium mb-3 ${colorScheme.text}`}>Streaming Services</h3>
             <div className="flex flex-wrap">
@@ -68,6 +89,7 @@ const FilterModal = ({ colorScheme, setFilterOpen, filterPreferences, toggleGenr
               ))}
             </div>
           </div>
+          
           <div className="mb-5">
             <h3 className={`font-medium mb-3 ${colorScheme.text}`}>Release Year</h3>
             <div className="px-2">
@@ -93,6 +115,7 @@ const FilterModal = ({ colorScheme, setFilterOpen, filterPreferences, toggleGenr
               />
             </div>
           </div>
+          
           <div className="mb-5">
             <h3 className={`font-medium mb-3 ${colorScheme.text}`}>Minimum Rating</h3>
             <div className="flex items-center">
@@ -108,18 +131,20 @@ const FilterModal = ({ colorScheme, setFilterOpen, filterPreferences, toggleGenr
               <span className="ml-2 text-yellow-500 font-medium">{filterPreferences.minRating}+</span>
             </div>
           </div>
+          
           <div className="flex space-x-3 mt-8">
             <button 
               className={`flex-1 border ${colorScheme.border} ${colorScheme.text} py-3 rounded-lg font-medium`}
-              onClick={() => {
-                // Reset filters (implement as needed)
-              }}
+              onClick={handleResetFilters}
             >
               Reset
             </button>
             <button 
               className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg font-medium"
-              onClick={applyFilters}
+              onClick={() => {
+                applyFilters();
+                setFilterOpen(false);
+              }}
             >
               Apply Filters
             </button>

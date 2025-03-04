@@ -1,12 +1,20 @@
 // src/services/movieService.js
 
-// Note: In a real application, you would store the API key in an environment variable
-const API_KEY = "YOUR_TMDB_API_KEY"; 
-const BASE_URL = "https://api.themoviedb.org/3";
+// Use environment variables correctly for Vite
+const API_KEY = import.meta.env.VITE_TMDB_API_KEY;
+const BASE_URL = import.meta.env.VITE_API_URL || "https://api.themoviedb.org/3";
 const IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w500";
+
+// Check if API key is available
+const isApiAvailable = !!API_KEY;
 
 // Utility to handle API requests
 const fetchFromAPI = async (endpoint, params = {}) => {
+  if (!isApiAvailable) {
+    console.warn('API key not available. Using sample data instead.');
+    throw new Error('API key not configured');
+  }
+  
   const url = new URL(`${BASE_URL}${endpoint}`);
   url.searchParams.append("api_key", API_KEY);
   
@@ -32,6 +40,11 @@ const fetchFromAPI = async (endpoint, params = {}) => {
 // Get trending movies
 export const getTrendingMovies = async () => {
   try {
+    if (!isApiAvailable) {
+      // Return empty array to trigger fallback to sample data
+      return [];
+    }
+    
     const data = await fetchFromAPI("/trending/movie/week");
     return transformMovies(data.results);
   } catch (error) {
@@ -43,6 +56,10 @@ export const getTrendingMovies = async () => {
 // Get movies by genre
 export const getMoviesByGenre = async (genreId) => {
   try {
+    if (!isApiAvailable) {
+      return [];
+    }
+    
     const data = await fetchFromAPI("/discover/movie", {
       with_genres: genreId,
       sort_by: "popularity.desc"
@@ -57,6 +74,10 @@ export const getMoviesByGenre = async (genreId) => {
 // Search movies
 export const searchMovies = async (query) => {
   try {
+    if (!isApiAvailable) {
+      return [];
+    }
+    
     const data = await fetchFromAPI("/search/movie", { query });
     return transformMovies(data.results);
   } catch (error) {
@@ -68,6 +89,10 @@ export const searchMovies = async (query) => {
 // Get movie details
 export const getMovieDetails = async (movieId) => {
   try {
+    if (!isApiAvailable) {
+      return null;
+    }
+    
     const data = await fetchFromAPI(`/movie/${movieId}`, {
       append_to_response: "credits,recommendations,videos"
     });
@@ -81,6 +106,10 @@ export const getMovieDetails = async (movieId) => {
 // Get movie genres
 export const getGenres = async () => {
   try {
+    if (!isApiAvailable) {
+      return [];
+    }
+    
     const data = await fetchFromAPI("/genre/movie/list");
     return data.genres;
   } catch (error) {
@@ -94,7 +123,7 @@ const transformMovies = (movies) => {
   return movies.map(movie => ({
     id: movie.id,
     title: movie.title,
-    year: new Date(movie.release_date).getFullYear(),
+    year: movie.release_date ? new Date(movie.release_date).getFullYear() : "Unknown",
     genre: movie.genre_ids, // This would need to be mapped to genre names in a real app
     rating: movie.vote_average,
     description: movie.overview,
@@ -110,11 +139,11 @@ const transformMovieDetails = (movie) => {
   return {
     id: movie.id,
     title: movie.title,
-    year: new Date(movie.release_date).getFullYear(),
+    year: movie.release_date ? new Date(movie.release_date).getFullYear() : "Unknown",
     genre: movie.genres.map(g => g.name),
     director: movie.credits?.crew?.find(person => person.job === "Director")?.name || "Unknown",
     rating: movie.vote_average,
-    duration: `${Math.floor(movie.runtime / 60)}h ${movie.runtime % 60}m`,
+    duration: movie.runtime ? `${Math.floor(movie.runtime / 60)}h ${movie.runtime % 60}m` : "Unknown",
     description: movie.overview,
     posterUrl: movie.poster_path ? `${IMAGE_BASE_URL}${movie.poster_path}` : "https://placehold.co/500x750/png",
     backdropUrl: movie.backdrop_path ? `${IMAGE_BASE_URL}${movie.backdrop_path}` : null,

@@ -7,8 +7,9 @@ import WatchlistPage from './pages/WatchlistPage';
 import ProfilePage from './pages/ProfilePage';
 import LoadingScreen from './components/LoadingScreen';
 import Toast from './components/Toast';
-import { AppProvider, useAppContext } from './context/AppContext';
+import { useAppContext } from './context/AppContext';
 import * as movieService from './services/movieService';
+import { FEATURE_FLAGS } from './config';
 
 function AppContent() {
   const { 
@@ -24,20 +25,40 @@ function AppContent() {
     const fetchMovies = async () => {
       setIsLoading(true);
       try {
-        // For simplicity, we'll just use sample data for now
-        // In a real app, you'd use the API
-        const sampleMovies = await movieService.useSampleMovies();
-        
-        // Add mock streaming information if needed
-        const moviesWithStreaming = sampleMovies.map(movie => ({
-          ...movie,
-          streamingOn: movie.streamingOn || movieService.getStreamingServices(movie.id)
-        }));
-        
-        setMovies(moviesWithStreaming);
+        // Try to get movies from the API if API key is available
+        if (FEATURE_FLAGS.USE_REAL_API) {
+          console.log('Using real TMDB API data');
+          const trendingMovies = await movieService.getTrendingMovies();
+          
+          if (trendingMovies.length > 0) {
+            // Add mock streaming information
+            const moviesWithStreaming = trendingMovies.map(movie => ({
+              ...movie,
+              streamingOn: movieService.getStreamingServices(movie.id)
+            }));
+            setMovies(moviesWithStreaming);
+          } else {
+            // Fallback to sample data if API returns empty results
+            console.log('API returned no results, using sample data');
+            const sampleMovies = await movieService.useSampleMovies();
+            setMovies(sampleMovies);
+          }
+        } else {
+          // Use sample data if API key is not configured
+          console.log('Using sample movie data');
+          const sampleMovies = await movieService.useSampleMovies();
+          
+          // Add mock streaming information if needed
+          const moviesWithStreaming = sampleMovies.map(movie => ({
+            ...movie,
+            streamingOn: movie.streamingOn || movieService.getStreamingServices(movie.id)
+          }));
+          
+          setMovies(moviesWithStreaming);
+        }
       } catch (error) {
         console.error("Error fetching initial movies:", error);
-        // Fallback to sample data
+        // Fallback to sample data on error
         const sampleMovies = await movieService.useSampleMovies();
         setMovies(sampleMovies);
       } finally {
@@ -85,11 +106,7 @@ function AppContent() {
 }
 
 function App() {
-  return (
-    <AppProvider>
-      <AppContent />
-    </AppProvider>
-  );
+  return <AppContent />;
 }
 
 export default App;

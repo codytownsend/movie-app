@@ -10,7 +10,13 @@ const MovieCard = ({
   direction, 
   setDirection 
 }) => {
-  const { colorScheme, darkMode } = useAppContext();
+  const { 
+    colorScheme, 
+    darkMode,
+    watchlist,
+    setWatchlist,
+    showToast
+  } = useAppContext();
   
   const cardRef = useRef(null);
   const initialTouchPosition = useRef(null);
@@ -50,10 +56,10 @@ const MovieCard = ({
     
     if (currentSwipeDistance.current > threshold) {
       // Complete the swipe right animation and call handler
-      animateCardAway('right', () => handleSwipe(true));
+      animateCardAway('right', () => handleSwipeWithWatchlist(true));
     } else if (currentSwipeDistance.current < -threshold) {
       // Complete the swipe left animation and call handler
-      animateCardAway('left', () => handleSwipe(false));
+      animateCardAway('left', () => handleSwipeWithWatchlist(false));
     } else {
       // Return card to center if not swiped far enough
       animateCardReturn();
@@ -93,16 +99,33 @@ const MovieCard = ({
     
     if (currentSwipeDistance.current > threshold) {
       // Complete the swipe right animation and call handler
-      animateCardAway('right', () => handleSwipe(true));
+      animateCardAway('right', () => handleSwipeWithWatchlist(true));
     } else if (currentSwipeDistance.current < -threshold) {
       // Complete the swipe left animation and call handler
-      animateCardAway('left', () => handleSwipe(false));
+      animateCardAway('left', () => handleSwipeWithWatchlist(false));
     } else {
       // Return card to center if not swiped far enough
       animateCardReturn();
     }
     
     initialTouchPosition.current = null;
+  };
+  
+  // Add movie to watchlist when swiped right
+  const handleSwipeWithWatchlist = (liked) => {
+    if (liked && currentMovie) {
+      // Check if movie is already in watchlist
+      const alreadyInWatchlist = watchlist.some(movie => movie.id === currentMovie.id);
+      
+      if (!alreadyInWatchlist) {
+        // Add to watchlist
+        setWatchlist(prev => [...prev, currentMovie]);
+        showToast("Added to watchlist");
+      }
+    }
+    
+    // Call the original swipe handler
+    handleSwipe(liked);
   };
 
   // Animation functions
@@ -291,23 +314,25 @@ const MovieCard = ({
         </button>
       </div>
       
-      {/* Add custom animation classes */}
-      <style jsx>{`
-        .scale-in-center {
-          animation: scale-in-center 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
-        }
-        
-        @keyframes scale-in-center {
-          0% {
-            transform: scale(0);
-            opacity: 0;
+      {/* Custom animation styles */}
+      <style>
+        {`
+          .scale-in-center {
+            animation: scale-in-center 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
           }
-          100% {
-            transform: scale(1) rotate(${direction === 'right' ? '-12deg' : '12deg'});
-            opacity: 1;
+          
+          @keyframes scale-in-center {
+            0% {
+              transform: scale(0);
+              opacity: 0;
+            }
+            100% {
+              transform: scale(1) rotate(${direction === 'right' ? '-12deg' : '12deg'});
+              opacity: 1;
+            }
           }
-        }
-      `}</style>
+        `}
+      </style>
     </div>
   );
 };

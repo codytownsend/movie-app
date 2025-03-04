@@ -1,9 +1,43 @@
-// src/modals/MovieDetailsModal.js
+// src/modals/MovieDetailsModal.jsx
 import React from 'react';
 import { ChevronLeft, Share2, Bookmark, Play, Star, Clock, Calendar } from 'lucide-react';
+import { useAppContext } from '../context/AppContext';
 
-const MovieDetailsModal = ({ currentMovie, colorScheme, setShowDetails, handleSwipe, showToast, darkMode }) => {
+const MovieDetailsModal = ({ currentMovie, setShowDetails }) => {
+  const { 
+    colorScheme, 
+    darkMode, 
+    showToast, 
+    watchlist, 
+    setWatchlist, 
+    handleSwipe 
+  } = useAppContext();
+
+  // Handle adding to watchlist
+  const handleAddToWatchlist = (e) => {
+    e.stopPropagation();
+    
+    // Check if already in watchlist
+    const alreadyInWatchlist = watchlist.some(movie => movie.id === currentMovie.id);
+    
+    if (!alreadyInWatchlist) {
+      setWatchlist(prev => [...prev, currentMovie]);
+      handleSwipe(true);
+      setShowDetails(false);
+      showToast("Added to watchlist!");
+    } else {
+      showToast("Already in your watchlist");
+    }
+  };
+
+  // Handle share
+  const handleShare = (e) => {
+    e.stopPropagation();
+    showToast("Shared successfully!");
+  };
+
   if (!currentMovie) return null;
+  
   return (
     <div className="fixed inset-0 z-50 flex items-end" onClick={() => setShowDetails(false)}>
       <div
@@ -31,20 +65,23 @@ const MovieDetailsModal = ({ currentMovie, colorScheme, setShowDetails, handleSw
           </button>
           <div className="absolute top-4 right-4 flex space-x-2">
             <button 
-              onClick={(e) => { e.stopPropagation(); showToast("Shared successfully!"); }}
+              onClick={handleShare}
               className="bg-black bg-opacity-50 backdrop-blur-sm rounded-full p-2 text-white shadow-md"
             >
               <Share2 className="w-5 h-5" />
             </button>
             <button 
-              onClick={(e) => { e.stopPropagation(); handleSwipe(true); setShowDetails(false); showToast("Added to watchlist!"); }}
+              onClick={handleAddToWatchlist}
               className="bg-black bg-opacity-50 backdrop-blur-sm rounded-full p-2 text-white shadow-md"
             >
               <Bookmark className="w-5 h-5" />
             </button>
           </div>
           <div className="absolute bottom-0 right-0 m-4">
-            <button className="bg-gradient-to-r from-red-600 to-red-500 text-white rounded-full p-3 flex items-center shadow-lg transform transition hover:scale-105 active:scale-95">
+            <button 
+              className="bg-gradient-to-r from-red-600 to-red-500 text-white rounded-full p-3 flex items-center shadow-lg transform transition hover:scale-105 active:scale-95"
+              onClick={() => showToast("Playing trailer...")}
+            >
               <Play className="w-5 h-5" />
               <span className="ml-1 font-medium">Watch Trailer</span>
             </button>
@@ -66,7 +103,7 @@ const MovieDetailsModal = ({ currentMovie, colorScheme, setShowDetails, handleSw
           <div className="flex items-center mt-4 flex-wrap">
             <div className={`flex items-center mr-4 ${colorScheme.textSecondary}`}>
               <Clock className="w-4 h-4" />
-              <span className="ml-1 text-sm">{currentMovie.duration}</span>
+              <span className="ml-1 text-sm">{currentMovie.duration || "2h 0m"}</span>
             </div>
             <div className={`flex items-center mr-4 ${colorScheme.textSecondary}`}>
               <Calendar className="w-4 h-4" />
@@ -74,7 +111,7 @@ const MovieDetailsModal = ({ currentMovie, colorScheme, setShowDetails, handleSw
             </div>
           </div>
           <div className="flex flex-wrap mt-3">
-            {currentMovie.genre.map((g, i) => (
+            {currentMovie.genre && currentMovie.genre.map((g, i) => (
               <span 
                 key={i} 
                 className={`text-xs ${darkMode ? 'bg-gray-700' : 'bg-gray-200'} rounded-full px-3 py-1 mr-2 mb-2 ${colorScheme.text}`}
@@ -92,7 +129,7 @@ const MovieDetailsModal = ({ currentMovie, colorScheme, setShowDetails, handleSw
           <div className="mt-5">
             <h3 className={`font-medium ${colorScheme.text}`}>Cast</h3>
             <div className="flex overflow-x-auto py-2 space-x-4">
-              {currentMovie.cast.map((actor, i) => (
+              {currentMovie.cast && currentMovie.cast.map((actor, i) => (
                 <div key={i} className="flex-shrink-0 w-16">
                   <div className={`w-16 h-16 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-200'} flex items-center justify-center mb-1`}>
                     <span className="text-xs font-medium">{actor.split(' ').map(n => n[0]).join('')}</span>
@@ -113,7 +150,7 @@ const MovieDetailsModal = ({ currentMovie, colorScheme, setShowDetails, handleSw
               </button>
             </div>
             <div className="flex mt-2">
-              {currentMovie.streamingOn.map((platform, i) => (
+              {currentMovie.streamingOn && currentMovie.streamingOn.map((platform, i) => (
                 <div key={i} className="mr-3">
                   <div className="h-12 w-12 bg-gray-300 rounded-lg flex items-center justify-center">
                     <span className="text-xs font-medium">{platform.charAt(0)}</span>

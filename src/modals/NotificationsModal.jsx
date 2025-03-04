@@ -1,8 +1,25 @@
-// src/modals/NotificationsModal.js
+// src/modals/NotificationsModal.jsx
 import React from 'react';
 import { ArrowLeft, Zap, Bell, Star } from 'lucide-react';
+import { useAppContext } from '../context/AppContext';
 
-const NotificationsModal = ({ colorScheme, setNotificationsOpen, showToast, setCurrentIndex }) => {
+const NotificationsModal = ({ setNotificationsOpen }) => {
+  const {
+    colorScheme,
+    showToast,
+    setCurrentIndex,
+    movies
+  } = useAppContext();
+
+  const handleMarkAllAsRead = () => {
+    showToast("All notifications marked as read");
+  };
+
+  const handleViewMovie = (movieIndex) => {
+    setCurrentIndex(movieIndex);
+    setNotificationsOpen(false);
+  };
+
   return (
     <div className={`fixed inset-0 z-50 ${colorScheme.bg}`}>
       <div className="h-full overflow-y-auto pb-20">
@@ -18,11 +35,12 @@ const NotificationsModal = ({ colorScheme, setNotificationsOpen, showToast, setC
           </div>
           <button 
             className={colorScheme.textSecondary}
-            onClick={() => showToast("All notifications marked as read")}
+            onClick={handleMarkAllAsRead}
           >
             Mark all as read
           </button>
         </header>
+        
         <div className="p-4">
           <div className={`${colorScheme.card} rounded-lg overflow-hidden shadow-md mb-4`}>
             <div className="p-4 border-l-4 border-purple-500">
@@ -35,16 +53,14 @@ const NotificationsModal = ({ colorScheme, setNotificationsOpen, showToast, setC
               <div className="flex justify-end mt-2">
                 <button 
                   className="text-purple-500 text-sm"
-                  onClick={() => {
-                    setNotificationsOpen(false);
-                    setCurrentIndex(0);
-                  }}
+                  onClick={() => handleViewMovie(0)}
                 >
                   View
                 </button>
               </div>
             </div>
           </div>
+          
           <div className={`${colorScheme.card} rounded-lg overflow-hidden shadow-md mb-4 opacity-60`}>
             <div className="p-4 border-l-4 border-blue-500">
               <div className="flex items-center mb-2">
@@ -57,6 +73,7 @@ const NotificationsModal = ({ colorScheme, setNotificationsOpen, showToast, setC
               </div>
             </div>
           </div>
+          
           <div className={`${colorScheme.card} rounded-lg overflow-hidden shadow-md mb-4 opacity-60`}>
             <div className="p-4 border-l-4 border-green-500">
               <div className="flex items-center mb-2">
@@ -69,7 +86,9 @@ const NotificationsModal = ({ colorScheme, setNotificationsOpen, showToast, setC
               </div>
             </div>
           </div>
+          
           <h3 className={`font-medium mt-6 mb-3 ${colorScheme.text}`}>Earlier</h3>
+          
           <div className={`${colorScheme.card} rounded-lg overflow-hidden shadow-md mb-4 opacity-60`}>
             <div className="p-4">
               <div className="flex items-center mb-2">
@@ -79,7 +98,10 @@ const NotificationsModal = ({ colorScheme, setNotificationsOpen, showToast, setC
               <p className={`text-sm ${colorScheme.textSecondary}`}>How would you rate "The Queen's Gambit"?</p>
               <div className="flex mt-2">
                 {[1, 2, 3, 4, 5].map(star => (
-                  <Star key={star} className="w-6 h-6 text-gray-300 hover:text-yellow-400 cursor-pointer" />
+                  <Star 
+                    key={star} 
+                    className="w-6 h-6 text-gray-300 hover:text-yellow-400 cursor-pointer" 
+                  />
                 ))}
               </div>
             </div>
