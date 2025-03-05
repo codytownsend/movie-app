@@ -1,6 +1,6 @@
 // src/modals/FilterModal.jsx
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Star, RefreshCw, Sliders, Calendar, Award } from 'lucide-react';
+import { X, RefreshCw, Sliders, Calendar, Award } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 
 const FilterModal = ({ setFilterOpen }) => {
@@ -21,6 +21,22 @@ const FilterModal = ({ setFilterOpen }) => {
   const [localFilters, setLocalFilters] = useState({...filterPreferences});
   const [matchCount, setMatchCount] = useState(0);
   const modalRef = useRef(null);
+  
+  // State for decade selection
+  const [selectedDecades, setSelectedDecades] = useState(() => {
+    // Convert current year range to decades
+    const startDecade = Math.floor(localFilters.yearRange[0] / 10) * 10;
+    const endDecade = Math.floor(localFilters.yearRange[1] / 10) * 10;
+    
+    // Create array of selected decades
+    const decades = [];
+    for (let decade = startDecade; decade <= endDecade; decade += 10) {
+      if (decade >= 1920 && decade <= 2020) {
+        decades.push(decade);
+      }
+    }
+    return decades;
+  });
   
   // Calculate the estimated match count when filters change
   useEffect(() => {
@@ -51,6 +67,34 @@ const FilterModal = ({ setFilterOpen }) => {
     };
   }, [setFilterOpen]);
 
+  // Toggle a decade in selection
+  const toggleDecade = (decade) => {
+    setSelectedDecades(prev => {
+      if (prev.includes(decade)) {
+        return prev.filter(d => d !== decade);
+      } else {
+        return [...prev, decade].sort((a, b) => a - b);
+      }
+    });
+    
+    // Update year range based on selected decades
+    updateYearRangeFromDecades();
+  };
+  
+  // Update year range filter based on selected decades
+  const updateYearRangeFromDecades = () => {
+    if (selectedDecades.length === 0) return;
+    
+    const minDecade = Math.min(...selectedDecades);
+    const maxDecade = Math.max(...selectedDecades);
+    const newRange = [minDecade, maxDecade + 9];
+    
+    setLocalFilters(prev => ({
+      ...prev,
+      yearRange: newRange
+    }));
+  };
+
   // Handle filter reset
   const handleResetFilters = () => {
     const resetFilters = {
@@ -61,6 +105,10 @@ const FilterModal = ({ setFilterOpen }) => {
     };
     
     setLocalFilters(resetFilters);
+    
+    // Reset decades selection too
+    setSelectedDecades([1970, 1980, 1990, 2000, 2010, 2020]);
+    
     showToast("Filters reset");
   };
 
@@ -86,6 +134,16 @@ const FilterModal = ({ setFilterOpen }) => {
 
   // Apply all filters at once
   const handleApplyFilters = () => {
+    // Update year range from selected decades before applying
+    if (selectedDecades.length > 0) {
+      const minDecade = Math.min(...selectedDecades);
+      const maxDecade = Math.max(...selectedDecades);
+      setLocalFilters(prev => ({
+        ...prev,
+        yearRange: [minDecade, maxDecade + 9]
+      }));
+    }
+    
     // Update all filter states at once
     localFilters.genres.forEach(genre => {
       if (!filterPreferences.genres.includes(genre)) {
@@ -146,14 +204,17 @@ const FilterModal = ({ setFilterOpen }) => {
 
   const currentYear = new Date().getFullYear();
   
+  // Available decades for selection
+  const availableDecades = [1920, 1930, 1940, 1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020];
+  
   // Quick selects for year range
   const yearQuickSelects = [
-    { label: "Recent", from: currentYear - 2, to: currentYear },
-    { label: "2010s", from: 2010, to: 2019 },
-    { label: "2000s", from: 2000, to: 2009 },
-    { label: "90s", from: 1990, to: 1999 },
-    { label: "80s", from: 1980, to: 1989 },
-    { label: "Classics", from: 1920, to: 1979 }
+    { label: "Recent", decades: [2020] },
+    { label: "2010s", decades: [2010] },
+    { label: "2000s", decades: [2000] },
+    { label: "90s", decades: [1990] },
+    { label: "80s", decades: [1980] },
+    { label: "Classics", decades: [1920, 1930, 1940, 1950, 1960, 1970] }
   ];
 
   // Rating presets
@@ -170,7 +231,7 @@ const FilterModal = ({ setFilterOpen }) => {
     localFilters.genres.length + 
     localFilters.services.length + 
     (localFilters.minRating > 0 ? 1 : 0) + 
-    (localFilters.yearRange[0] > 1920 || localFilters.yearRange[1] < currentYear ? 1 : 0);
+    (selectedDecades.length > 0 && selectedDecades.length < availableDecades.length ? 1 : 0);
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
@@ -241,7 +302,7 @@ const FilterModal = ({ setFilterOpen }) => {
               {/* Genre categories */}
               {genreCategories.map((category, index) => (
                 <div key={category.name} className={index > 0 ? 'mt-5' : ''}>
-                  <div className="text-xs uppercase tracking-wider font-medium mb-3 ml-1 opacity-60">
+                  <div className="text-xs text-white uppercase tracking-wider font-medium mb-3 ml-1 opacity-60">
                     {category.name}
                   </div>
                   <div className="flex flex-wrap gap-2.5">
@@ -257,7 +318,7 @@ const FilterModal = ({ setFilterOpen }) => {
                                 ? 'bg-indigo-500/20 text-indigo-300 ring-1 ring-indigo-500/30' 
                                 : 'bg-indigo-100 text-indigo-700 ring-1 ring-indigo-400/30'
                               : darkMode 
-                                ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' 
+                                ? 'bg-gray-800 text-gray-200 hover:bg-gray-700' 
                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                           }`}
                         >
@@ -303,24 +364,24 @@ const FilterModal = ({ setFilterOpen }) => {
                       }`}
                       style={{
                         backgroundColor: isSelected 
-                          ? darkMode ? `rgba(${rgbColor}, 0.2)` : `rgba(${rgbColor}, 0.1)`
+                          ? darkMode ? `rgba(${rgbColor}, 0.3)` : `rgba(${rgbColor}, 0.1)`
                           : darkMode ? '#1f2937' : '#f3f4f6',
                         ringColor: isSelected 
-                          ? `rgba(${rgbColor}, ${darkMode ? 0.6 : 0.5})`
-                          : darkMode ? 'rgba(55, 65, 81, 0.5)' : 'rgba(229, 231, 235, 0.8)',
+                          ? `rgba(${rgbColor}, ${darkMode ? 0.8 : 0.5})`
+                          : darkMode ? 'rgba(99, 102, 241, 0.6)' : 'rgba(229, 231, 235, 0.8)',
                       }}
                     >
                       <div 
                         className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2 ${
                           isSelected ? 'scale-110' : 'scale-100'
                         } transition-transform duration-300`}
-                        style={{
+                                                  style={{
                           backgroundColor: isSelected 
                             ? service.color
-                            : darkMode ? '#111827' : '#ffffff',
+                            : darkMode ? '#1f2937' : '#ffffff',
                           boxShadow: isSelected
-                            ? `0 4px 12px rgba(${rgbColor}, 0.3)`
-                            : darkMode ? '0 4px 6px rgba(0, 0, 0, 0.1)' : '0 4px 6px rgba(0, 0, 0, 0.05)'
+                            ? `0 4px 12px rgba(${rgbColor}, 0.5)`
+                            : darkMode ? '0 4px 6px rgba(255, 255, 255, 0.1)' : '0 4px 6px rgba(0, 0, 0, 0.05)'
                         }}
                       >
                         <span 
@@ -328,7 +389,11 @@ const FilterModal = ({ setFilterOpen }) => {
                           style={{
                             color: isSelected 
                               ? '#ffffff' 
-                              : service.color
+                              : service.color === '#000000' 
+                                ? darkMode ? '#ffffff' : '#000000'
+                                : darkMode && (service.color === "#110F5E" || service.color === "#5822b4")
+                                  ? '#ffffff'
+                                  : service.color
                           }}
                         >
                           {service.name.charAt(0)}
@@ -337,8 +402,8 @@ const FilterModal = ({ setFilterOpen }) => {
                       <span 
                         className={`text-xs font-medium ${
                           isSelected 
-                            ? darkMode ? 'text-white' : 'text-gray-900' 
-                            : darkMode ? 'text-gray-300' : 'text-gray-600'
+                            ? 'text-white' 
+                            : darkMode ? 'text-gray-200' : 'text-gray-700'
                         }`}
                       >
                         {service.name.split(' ')[0]}
@@ -361,139 +426,90 @@ const FilterModal = ({ setFilterOpen }) => {
               </div>
             </div>
             
-            {/* Year Range Section */}
+            {/* Decades Section (replacing Year Range) */}
             <div className="mb-8">
               <SectionHeader 
                 icon={<Calendar className="w-5 h-5" />}
-                title="Release Year" 
-                count={(localFilters.yearRange[0] > 1920 || localFilters.yearRange[1] < currentYear) ? 1 : 0} 
-                value={`${localFilters.yearRange[0]} — ${localFilters.yearRange[1]}`}
+                title="Release Decades" 
+                count={selectedDecades.length > 0 && selectedDecades.length < availableDecades.length ? 1 : 0} 
+                value={selectedDecades.length > 0 ? `${Math.min(...selectedDecades)}s—${Math.max(...selectedDecades)}s` : 'All decades'}
               />
               
               <div className={`${darkMode ? 'bg-gray-800' : 'bg-gray-50'} p-5 rounded-2xl overflow-hidden`}>
-                {/* Year range timeline */}
-                <div className="relative mb-8 h-1.5">
-                  <div className={`absolute inset-0 ${darkMode ? 'bg-gray-700' : 'bg-gray-200'} rounded-full`}></div>
-                  <div 
-                    className="absolute top-0 bottom-0 bg-indigo-500 rounded-full"
-                    style={{
-                      left: `${((localFilters.yearRange[0] - 1920) / (currentYear - 1920)) * 100}%`,
-                      right: `${100 - ((localFilters.yearRange[1]) / currentYear) * 100}%`
-                    }}
-                  ></div>
-                  
-                  {/* Timeline markers */}
-                  {[1920, 1950, 1980, 2000, currentYear].map(year => (
-                    <div 
-                      key={year} 
-                      className="absolute top-3 transform -translate-x-1/2 flex flex-col items-center"
-                      style={{ left: `${((year - 1920) / (currentYear - 1920)) * 100}%` }}
-                    >
-                      <div className={`w-0.5 h-2 ${darkMode ? 'bg-gray-600' : 'bg-gray-300'}`}></div>
-                      <span className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                        {year}
-                      </span>
-                    </div>
-                  ))}
-                  
-                  {/* Active range indicators */}
-                  <div 
-                    className="absolute top-[-5px] w-3 h-3 bg-white rounded-full shadow-md flex items-center justify-center transform -translate-x-1/2 transition-all duration-200 cursor-pointer"
-                    style={{ left: `${((localFilters.yearRange[0] - 1920) / (currentYear - 1920)) * 100}%` }}
-                  >
-                    <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
-                  </div>
-                  
-                  <div 
-                    className="absolute top-[-5px] w-3 h-3 bg-white rounded-full shadow-md flex items-center justify-center transform -translate-x-1/2 transition-all duration-200 cursor-pointer"
-                    style={{ left: `${((localFilters.yearRange[1] - 1920) / (currentYear - 1920)) * 100}%` }}
-                  >
-                    <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
-                  </div>
-                </div>
-                
-                {/* Year range inputs */}
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div>
-                    <span className={`text-xs font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'} ml-1 mb-1.5 block`}>
-                      From
-                    </span>
-                    <input 
-                      type="number"
-                      min="1920"
-                      max={localFilters.yearRange[1]}
-                      value={localFilters.yearRange[0]}
-                      onChange={(e) => setLocalFilters(prev => ({
-                        ...prev,
-                        yearRange: [
-                          Math.max(1920, Math.min(parseInt(e.target.value) || 1920, prev.yearRange[1])),
-                          prev.yearRange[1]
-                        ]
-                      }))}
-                      className={`w-full px-4 py-2.5 rounded-xl text-center font-medium ${
-                        darkMode 
-                          ? 'bg-gray-700 text-white border-gray-600 focus:ring-indigo-500'
-                          : 'bg-white text-gray-800 border-gray-200 focus:ring-indigo-500'
-                      } border focus:ring-2 focus:outline-none`}
-                    />
-                  </div>
-                  <div>
-                    <span className={`text-xs font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'} ml-1 mb-1.5 block`}>
-                      To
-                    </span>
-                    <input 
-                      type="number"
-                      min={localFilters.yearRange[0]}
-                      max={currentYear}
-                      value={localFilters.yearRange[1]}
-                      onChange={(e) => setLocalFilters(prev => ({
-                        ...prev,
-                        yearRange: [
-                          prev.yearRange[0],
-                          Math.max(prev.yearRange[0], Math.min(parseInt(e.target.value) || currentYear, currentYear))
-                        ]
-                      }))}
-                      className={`w-full px-4 py-2.5 rounded-xl text-center font-medium ${
-                        darkMode 
-                          ? 'bg-gray-700 text-white border-gray-600 focus:ring-indigo-500'
-                          : 'bg-white text-gray-800 border-gray-200 focus:ring-indigo-500'
-                      } border focus:ring-2 focus:outline-none`}
-                    />
-                  </div>
-                </div>
-                
-                {/* Quick selects */}
-                <div className="grid grid-cols-3 gap-2.5">
-                  {yearQuickSelects.map((option) => {
-                    const isSelected = 
-                      localFilters.yearRange[0] === option.from && 
-                      localFilters.yearRange[1] === option.to;
+                {/* Decades selection */}
+                <div className="flex flex-wrap gap-2.5 mb-6">
+                  {availableDecades.map((decade) => {
+                    const isSelected = selectedDecades.includes(decade);
                     return (
                       <button
-                        key={option.label}
-                        onClick={() => setLocalFilters(prev => ({
-                          ...prev,
-                          yearRange: [option.from, option.to]
-                        }))}
-                        className={`py-2.5 rounded-xl text-sm transition-all duration-200 ${
+                        key={decade}
+                        onClick={() => toggleDecade(decade)}
+                        className={`group px-4 py-2.5 rounded-xl text-sm transition-all duration-200 ${
                           isSelected
                             ? darkMode 
-                              ? 'bg-indigo-500/30 text-indigo-300 ring-1 ring-indigo-500/40' 
-                              : 'bg-indigo-100 text-indigo-700 ring-1 ring-indigo-400/40'
+                              ? 'bg-indigo-500/20 text-indigo-300 ring-1 ring-indigo-500/30' 
+                              : 'bg-indigo-100 text-indigo-700 ring-1 ring-indigo-400/30'
                             : darkMode 
-                              ? 'bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-white ring-1 ring-gray-600' 
-                              : 'bg-white text-gray-700 hover:bg-gray-50 ring-1 ring-gray-200'
+                              ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' 
+                              : 'bg-white text-gray-700 hover:bg-gray-100 ring-1 ring-gray-200'
                         }`}
                       >
-                        {option.label}
+                        <span className="relative">
+                          {decade}s
+                          {isSelected && (
+                            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-400 dark:bg-indigo-300 transform origin-left scale-x-100 group-hover:scale-x-0 transition-transform duration-300"></span>
+                          )}
+                        </span>
                       </button>
                     );
                   })}
                 </div>
+                
+                {/* Quick selects */}
+                <div>
+                  <div className="text-xs text-white uppercase tracking-wider font-medium mb-3 ml-1 opacity-60">
+                    Quick Select
+                  </div>
+                  <div className="grid grid-cols-3 gap-2.5">
+                    {yearQuickSelects.map((option) => {
+                      // Check if all of this option's decades are selected
+                      const isSelected = option.decades.every(decade => 
+                        selectedDecades.includes(decade)
+                      ) && option.decades.length === selectedDecades.length;
+                      
+                      return (
+                        <button
+                          key={option.label}
+                          onClick={() => {
+                            setSelectedDecades(option.decades);
+                            // Update year range based on selected decades
+                            const minDecade = Math.min(...option.decades);
+                            const maxDecade = Math.max(...option.decades);
+                            setLocalFilters(prev => ({
+                              ...prev,
+                              yearRange: [minDecade, maxDecade + 9]
+                            }));
+                          }}
+                          className={`py-2.5 rounded-xl text-sm transition-all duration-200 ${
+                            isSelected
+                              ? darkMode 
+                                ? 'bg-indigo-500/30 text-indigo-300 ring-1 ring-indigo-500/40' 
+                                : 'bg-indigo-100 text-indigo-700 ring-1 ring-indigo-400/40'
+                              : darkMode 
+                                ? 'bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-white ring-1 ring-gray-600' 
+                                : 'bg-white text-gray-700 hover:bg-gray-50 ring-1 ring-gray-200'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             </div>
             
-            {/* Rating Section */}
+            {/* Rating Section - Modified to remove stars */}
             <div className="mb-8">
               <SectionHeader 
                 icon={<Award className="w-5 h-5" />}
@@ -503,42 +519,15 @@ const FilterModal = ({ setFilterOpen }) => {
               />
               
               <div className={`${darkMode ? 'bg-gray-800' : 'bg-gray-50'} p-5 rounded-2xl overflow-hidden`}>
-                {/* Stars visualization */}
-                <div className="flex justify-center items-center h-10 mb-2 relative">
-                  {[1, 2, 3, 4, 5].map(star => (
-                    <button
-                      key={star}
-                      onClick={() => setLocalFilters(prev => ({
-                        ...prev,
-                        minRating: star * 2
-                      }))}
-                      className="relative mx-1.5 group"
-                    >
-                      <Star 
-                        className={`w-8 h-8 transition-colors duration-200 ${
-                          star <= Math.ceil(localFilters.minRating / 2) 
-                            ? 'text-yellow-400 fill-current' 
-                            : darkMode ? 'text-gray-600 group-hover:text-gray-500' : 'text-gray-300 group-hover:text-gray-400'
-                        }`}
-                      />
-                      
-                      {/* Animation for selected stars */}
-                      {star <= Math.ceil(localFilters.minRating / 2) && (
-                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center animate-ping-once">
-                          <Star className="w-8 h-8 text-yellow-400 fill-current opacity-0" />
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-                
                 {/* Rating value indicator */}
                 <div 
-                  className={`w-full h-12 ${darkMode ? 'bg-gray-700' : 'bg-white'} rounded-xl mb-6 flex items-center justify-center text-lg font-semibold ${
-                    localFilters.minRating >= 8 ? darkMode ? 'text-green-300' : 'text-green-600' : 
-                    localFilters.minRating >= 6 ? darkMode ? 'text-yellow-300' : 'text-yellow-600' : 
-                    darkMode ? 'text-gray-300' : 'text-gray-600'
-                  } shadow-sm border ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}
+                  className={`w-full h-14 ${darkMode ? 'bg-gray-700' : 'bg-white'} rounded-xl mb-6 flex items-center justify-center text-xl font-semibold shadow-sm border ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}
+                  style={{
+                    color: localFilters.minRating >= 8 ? darkMode ? 'rgb(134, 239, 172)' : 'rgb(22, 163, 74)' : 
+                           localFilters.minRating >= 6 ? darkMode ? 'rgb(253, 224, 71)' : 'rgb(202, 138, 4)' : 
+                           localFilters.minRating > 0 ? darkMode ? 'rgb(209, 213, 219)' : 'rgb(55, 65, 81)' :
+                           darkMode ? 'rgb(156, 163, 175)' : 'rgb(107, 114, 128)'
+                  }}
                 >
                   {localFilters.minRating === 0 ? 'Any Rating' : `${localFilters.minRating}+ / 10`}
                 </div>
@@ -548,8 +537,13 @@ const FilterModal = ({ setFilterOpen }) => {
                   <div className="relative">
                     <div className={`h-1.5 w-full ${darkMode ? 'bg-gray-700' : 'bg-gray-200'} rounded-full`}></div>
                     <div 
-                      className="absolute top-0 left-0 h-1.5 bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-full"
-                      style={{ width: `${(localFilters.minRating / 10) * 100}%` }}
+                      className="absolute top-0 left-0 h-1.5 rounded-full"
+                      style={{ 
+                        width: `${(localFilters.minRating / 10) * 100}%`,
+                        background: localFilters.minRating >= 8 ? 'linear-gradient(to right, rgb(134, 239, 172), rgb(74, 222, 128))' :
+                                   localFilters.minRating >= 6 ? 'linear-gradient(to right, rgb(253, 224, 71), rgb(234, 179, 8))' :
+                                   'linear-gradient(to right, rgb(129, 140, 248), rgb(99, 102, 241))'
+                      }}
                     ></div>
                     <input 
                       type="range" 
@@ -567,18 +561,31 @@ const FilterModal = ({ setFilterOpen }) => {
                     {/* Custom slider thumb */}
                     <div 
                       className="absolute top-[-4px] w-4 h-4 bg-white rounded-full shadow-md flex items-center justify-center transform -translate-x-1/2 pointer-events-none"
-                      style={{ left: `${(localFilters.minRating / 10) * 100}%` }}
+                      style={{ 
+                        left: `${(localFilters.minRating / 10) * 100}%`,
+                        backgroundColor: localFilters.minRating === 0 ? '#ffffff' : (
+                          localFilters.minRating >= 8 ? 'rgb(74, 222, 128)' :
+                          localFilters.minRating >= 6 ? 'rgb(234, 179, 8)' :
+                          'rgb(99, 102, 241)'
+                        )
+                      }}
                     >
-                      <div className="w-2.5 h-2.5 bg-yellow-400 rounded-full"></div>
                     </div>
                   </div>
                   
-                  {/* Rating labels */}
+                  {/* Rating scale labels */}
                   <div className="flex justify-between text-xs mt-3 px-1">
-                    <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>Any</span>
-                    <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>Average</span>
-                    <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>Good</span>
-                    <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>Excellent</span>
+                    <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>0</span>
+                    <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>1</span>
+                    <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>2</span>
+                    <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>3</span>
+                    <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>4</span>
+                    <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>5</span>
+                    <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>6</span>
+                    <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>7</span>
+                    <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>8</span>
+                    <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>9</span>
+                    <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>10</span>
                   </div>
                 </div>
                 
@@ -604,7 +611,7 @@ const FilterModal = ({ setFilterOpen }) => {
                       }
                     } else {
                       buttonClass = darkMode 
-                        ? 'bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-white ring-1 ring-gray-600' 
+                        ? 'bg-gray-700 text-gray-200 hover:bg-gray-600 hover:text-white ring-1 ring-indigo-500/30' 
                         : 'bg-white text-gray-700 hover:bg-gray-50 ring-1 ring-gray-200';
                     }
                     
@@ -633,7 +640,7 @@ const FilterModal = ({ setFilterOpen }) => {
             className={`w-full py-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center ${
               activeFilterCount > 0 
                 ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-600/20 hover:shadow-indigo-600/30' 
-                : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-500'
+                : darkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-200 text-gray-500'
             }`}
             onClick={handleApplyFilters}
             disabled={activeFilterCount === 0}
@@ -656,7 +663,7 @@ const SectionHeader = ({ icon, title, count = 0, value }) => (
   <div className="flex justify-between items-center mb-4">
     <div className="flex items-center">
       {icon && <div className="mr-2 text-indigo-500 dark:text-indigo-400">{icon}</div>}
-      <h3 className="font-medium text-gray-900 dark:text-white">{title}</h3>
+      <h3 className="font-medium text-white dark:text-white">{title}</h3>
       {count > 0 && (
         <span className="ml-2 w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 text-xs font-medium flex items-center justify-center">
           {count}

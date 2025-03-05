@@ -1,11 +1,13 @@
 // src/pages/SocialPage.jsx
 import React, { useState, useEffect } from 'react';
-import { Star, ThumbsUp, MessageCircle, Bookmark, Film, Users, User, UserPlus, Search } from 'lucide-react';
+import { Star, Eye, Bookmark, Film, Search, X, UserPlus, User } from 'lucide-react';
 import Header from '../components/Header';
 import BottomNavigation from '../components/BottomNavigation';
 import { useAppContext } from '../context/AppContext';
 import { sampleUsers, friendRecommendations } from '../data/sampleData';
 import NotificationsModal from '../modals/NotificationsModal';
+import MovieDetailsModal from '../modals/MovieDetailsModal';
+import RateMovieModal from '../modals/RateMovieModal';
 
 const SocialPage = () => {
   const { 
@@ -23,6 +25,12 @@ const SocialPage = () => {
   const [activityFeed, setActivityFeed] = useState([]);
   const [socialTabView, setSocialTabView] = useState('recommendations');
   const [friendSearchQuery, setFriendSearchQuery] = useState('');
+  const [selectedMovie, setSelectedMovie] = useState(null);
+  const [showMovieDetails, setShowMovieDetails] = useState(false);
+  const [showRateModal, setShowRateModal] = useState(false);
+  const [movieToRate, setMovieToRate] = useState(null);
+  const [userRatings, setUserRatings] = useState({}); // Store user ratings by movieId
+  const [unseenRecommendations, setUnseenRecommendations] = useState(true); // Track unread recommendations
   
   // Setup activity feed
   useEffect(() => {
@@ -45,7 +53,27 @@ const SocialPage = () => {
     );
     
     setActivityFeed(sortedActivities);
+    
+    // Mock some user ratings (in a real app, this would come from the API)
+    setUserRatings({
+      2: 4, // Movie ID 2 rated 4 stars
+      5: 3  // Movie ID 5 rated 3 stars
+    });
+    
+    // In a real app, you would check if there are new recommendations since the user's last visit
+    // For this demo, we'll just set it to true initially
+    setUnseenRecommendations(true);
   }, []);
+  
+  // Handle tab change and mark recommendations as seen when viewing that tab
+  const handleTabChange = (tab) => {
+    setSocialTabView(tab);
+    
+    // If switching to recommendations tab, mark them as seen
+    if (tab === 'recommendations') {
+      setUnseenRecommendations(false);
+    }
+  };
   
   // Format time elapsed (e.g., "2h ago")
   const formatTimeElapsed = (timestamp) => {
@@ -68,17 +96,51 @@ const SocialPage = () => {
     return movies.find(movie => movie.id === movieId);
   };
   
+  // Check if movie is in watchlist
+  const isInWatchlist = (movieId) => {
+    return watchlist.some(movie => movie.id === movieId);
+  };
+  
+  // Check if user has rated this movie
+  const hasRated = (movieId) => {
+    return userRatings.hasOwnProperty(movieId);
+  };
+  
   // Add to watchlist
   const addToWatchlist = (movie) => {
-    if (!watchlist.find(m => m.id === movie.id)) {
+    if (!isInWatchlist(movie.id)) {
       setWatchlist([...watchlist, movie]);
       showToast("Added to watchlist");
     } else {
-      showToast("Already in your watchlist");
+      // Remove from watchlist
+      setWatchlist(watchlist.filter(m => m.id !== movie.id));
+      showToast("Removed from watchlist");
     }
   };
 
-  // Filter friends based on search query
+  // Open movie details
+  const handleViewMovie = (movie) => {
+    setSelectedMovie(movie);
+    setShowMovieDetails(true);
+  };
+
+  // Open rate movie modal
+  const handleRateMovie = (movie) => {
+    setMovieToRate(movie);
+    setShowRateModal(true);
+  };
+
+  // Handle rating submission
+  const handleRateSubmit = (movieId, rating, comment) => {
+    // Update user ratings state
+    setUserRatings({
+      ...userRatings,
+      [movieId]: rating
+    });
+    
+    showToast(`Rated ${rating} stars!`);
+  };
+
   const filteredFriends = friendSearchQuery 
     ? sampleUsers.slice(1).filter(friend => 
         friend.name.toLowerCase().includes(friendSearchQuery.toLowerCase()) ||
@@ -87,47 +149,60 @@ const SocialPage = () => {
     : sampleUsers.slice(1);
 
   return (
-    <div className={`min-h-screen ${colorScheme.bg} flex flex-col max-w-md mx-auto overflow-hidden`}>
+    <div className="min-h-screen bg-gray-900 flex flex-col max-w-md mx-auto overflow-hidden">
+      {/* App header */}
       <Header 
+        setFilterOpen={setFilterOpen} 
         setNotificationsOpen={setNotificationsOpen}
       />
       
-      {/* Page Title */}
-      <div className="p-4 pb-2 flex items-center">
-        <h2 className={`text-xl font-bold ${colorScheme.text}`}>Social</h2>
-      </div>
-      
       {/* Tab Navigation */}
-      <div className={`px-4 ${colorScheme.card}`}>
-        <div className="flex border-b border-gray-200 dark:border-gray-700">
-          <TabButton 
-            label="Recommendations" 
-            isActive={socialTabView === 'recommendations'} 
-            onClick={() => setSocialTabView('recommendations')}
-            colorScheme={colorScheme}
-            badge={friendRecommendations.length > 0}
-          />
-          <TabButton 
-            label="Reviews" 
-            isActive={socialTabView === 'reviews'} 
-            onClick={() => setSocialTabView('reviews')}
-            colorScheme={colorScheme}
-          />
-          <TabButton 
-            label="Friends" 
-            isActive={socialTabView === 'friends'} 
-            onClick={() => setSocialTabView('friends')}
-            colorScheme={colorScheme}
-          />
+      <div className="border-b border-gray-800">
+        <div className="flex w-full px-4">
+          <button
+            className={`flex-1 py-3 text-center relative ${
+              socialTabView === 'recommendations' 
+                ? 'text-purple-500 border-b-2 border-purple-500 font-medium' 
+                : 'text-gray-400'
+            }`}
+            onClick={() => handleTabChange('recommendations')}
+          >
+            <div className="relative inline-block">
+              Recommendations
+              {unseenRecommendations && (
+                <span className="absolute -right-6 top-0 w-2 h-2 bg-red-500 rounded-full"></span>
+              )}
+            </div>
+          </button>
+          <button
+            className={`flex-1 py-3 text-center ${
+              socialTabView === 'reviews' 
+                ? 'text-purple-500 border-b-2 border-purple-500 font-medium' 
+                : 'text-gray-400'
+            }`}
+            onClick={() => handleTabChange('reviews')}
+          >
+            Reviews
+          </button>
+          <button
+            className={`flex-1 py-3 text-center ${
+              socialTabView === 'friends' 
+                ? 'text-purple-500 border-b-2 border-purple-500 font-medium' 
+                : 'text-gray-400'
+            }`}
+            onClick={() => handleTabChange('friends')}
+          >
+            Friends
+          </button>
         </div>
       </div>
       
       {/* Main Content Area */}
-      <div className="flex-1 p-4 overflow-y-auto pb-20">
+      <div className="flex-1 overflow-y-auto p-4 pb-20">
         {/* Recommendations Tab */}
         {socialTabView === 'recommendations' && (
           friendRecommendations.length > 0 ? (
-            <div className="space-y-4">
+            <div>
               {friendRecommendations.map((rec, index) => {
                 const friend = sampleUsers.find(user => user.id === rec.userId);
                 const movie = findMovieById(rec.movieId);
@@ -135,80 +210,98 @@ const SocialPage = () => {
                 if (!friend || !movie) return null;
                 
                 return (
-                  <div key={index} className={`${colorScheme.card} rounded-lg p-4 shadow`}>
-                    <div className="flex items-start">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white mr-3 flex-shrink-0">
-                        <span>{friend.avatar}</span>
+                  <div key={index} className="relative px-5 pt-4 pb-3 border-l-4 border-purple-500">
+                    {/* User info and timestamp */}
+                    <div className="flex items-center mb-3">
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white">
+                        <span className="text-xl font-medium">{friend.avatar}</span>
                       </div>
-                      
-                      <div className="flex-1">
-                        <div className="flex justify-between">
-                          <p className={`font-medium ${colorScheme.text}`}>
-                            {friend.name}
-                            <span className={`font-normal ${colorScheme.textSecondary}`}> recommended</span>
-                          </p>
-                          <span className={`text-xs ${colorScheme.textSecondary}`}>
-                            {formatTimeElapsed(rec.timestamp)}
-                          </span>
-                        </div>
-                        
-                        <p className={`text-sm my-2 ${colorScheme.text}`}>"{rec.message}"</p>
-                        
-                        <div 
-                          className={`flex rounded-lg overflow-hidden ${darkMode ? 'bg-gray-800' : 'bg-gray-100'} cursor-pointer`}
-                          onClick={() => {
-                            setActiveTab('discover');
-                            showToast(`Selected: ${movie.title}`);
-                          }}
-                        >
-                          <div className="w-16 h-20 bg-gray-300">
-                            <img src={movie.posterUrl} alt={movie.title} className="w-full h-full object-cover" />
-                          </div>
-                          <div className="p-2">
-                            <h4 className={`font-medium text-sm ${colorScheme.text}`}>{movie.title}</h4>
-                            <div className="flex items-center">
-                              <Star className="w-3 h-3 text-yellow-400 fill-current" />
-                              <span className={`text-xs ml-1 ${colorScheme.textSecondary}`}>{movie.rating}</span>
-                              <span className="mx-1">•</span>
-                              <span className={`text-xs ${colorScheme.textSecondary}`}>{movie.year}</span>
+                      <div className="ml-3">
+                        <p className="font-medium text-white">{friend.name}</p>
+                        <p className="text-xs text-gray-400">recommended a movie</p>
+                      </div>
+                      <div className="ml-auto">
+                        <span className="text-xs text-gray-400">
+                          {formatTimeElapsed(rec.timestamp)}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {/* Recommendation message */}
+                    {rec.message && (
+                      <div className="mb-4 px-4 py-3 bg-gray-800 rounded-lg">
+                        <p className="text-sm text-gray-300">"{rec.message}"</p>
+                      </div>
+                    )}
+                    
+                    {/* Movie card */}
+                    <div className="bg-gray-800 rounded-lg overflow-hidden mb-3">
+                      <div className="flex p-3">
+                        <img 
+                          src={movie.posterUrl} 
+                          alt={movie.title} 
+                          className="w-20 h-28 object-cover rounded-md"
+                        />
+                        <div className="ml-3">
+                          <h4 className="font-medium text-white">{movie.title}</h4>
+                          <div className="flex items-center mt-1 mb-2">
+                            <div className="bg-yellow-500 rounded px-2 py-0.5 text-xs font-bold text-black flex items-center">
+                              <Star className="w-3 h-3 mr-1 fill-current" />
+                              {movie.rating}
                             </div>
-                            <div className="flex flex-wrap mt-1">
-                              {movie.genre && movie.genre.slice(0, 2).map((g, i) => (
-                                <span key={i} className="text-xs bg-gray-200 text-gray-800 rounded-full px-2 py-0.5 mr-1">
-                                  {g}
-                                </span>
-                              ))}
-                            </div>
+                            <span className="mx-2 text-xs text-gray-400">•</span>
+                            <span className="text-xs text-gray-400">{movie.year}</span>
                           </div>
-                        </div>
-                        
-                        <div className="flex mt-3 justify-end">
-                          <button 
-                            className={`mr-3 px-3 py-1 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-200'} ${colorScheme.text} text-xs`}
-                            onClick={() => showToast("Recommendation dismissed")}
-                          >
-                            Dismiss
-                          </button>
-                          <button 
-                            className="px-3 py-1 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs"
-                            onClick={() => addToWatchlist(movie)}
-                          >
-                            Add to Watchlist
-                          </button>
+                          <div className="flex flex-wrap">
+                            {movie.genre && movie.genre.slice(0, 2).map((g, i) => (
+                              <span key={i} className="text-xs bg-gray-700 text-gray-300 rounded-full px-2 py-0.5 mr-1 mb-1">
+                                {g}
+                              </span>
+                            ))}
+                          </div>
                         </div>
                       </div>
+                    </div>
+                    
+                    {/* Action buttons */}
+                    <div className="flex">
+                      <button 
+                        className="flex-1 flex items-center justify-center py-2 bg-gray-800 text-gray-300 rounded-lg mr-2"
+                        onClick={() => handleViewMovie(movie)}
+                      >
+                        <Eye className="w-4 h-4 mr-2 text-blue-400" />
+                        View
+                      </button>
+                      <button 
+                        className="flex-1 flex items-center justify-center py-2 bg-gray-800 text-gray-300 rounded-lg mr-2"
+                        onClick={() => addToWatchlist(movie)}
+                      >
+                        <Bookmark 
+                          className={`w-4 h-4 mr-2 ${isInWatchlist(movie.id) ? 'text-green-400 fill-current' : 'text-green-400'}`} 
+                        />
+                        Bookmark
+                      </button>
+                      <button 
+                        className="flex-1 flex items-center justify-center py-2 bg-gray-800 text-gray-300 rounded-lg"
+                        onClick={() => handleRateMovie(movie)}
+                      >
+                        <Star 
+                          className={`w-4 h-4 mr-2 ${hasRated(movie.id) ? 'text-yellow-400 fill-current' : 'text-yellow-400'}`} 
+                        />
+                        Rate
+                      </button>
                     </div>
                   </div>
                 );
               })}
             </div>
           ) : (
-            <div className={`flex flex-col items-center justify-center h-64 text-center ${colorScheme.textSecondary}`}>
-              <div className="w-16 h-16 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center mb-4">
-                <Film className="w-8 h-8 text-gray-400" />
+            <div className="flex flex-col items-center justify-center h-64 text-center">
+              <div className="w-16 h-16 rounded-full bg-gray-800 flex items-center justify-center mb-4">
+                <Film className="w-8 h-8 text-gray-500" />
               </div>
-              <p className="mb-2">No recommendations yet</p>
-              <p className="text-sm max-w-xs">
+              <p className="mb-2 text-gray-300">No recommendations yet</p>
+              <p className="text-sm text-gray-500 max-w-xs">
                 Your friends haven't sent you any movie recommendations yet
               </p>
             </div>
@@ -218,97 +311,100 @@ const SocialPage = () => {
         {/* Reviews Tab */}
         {socialTabView === 'reviews' && (
           <div>
-            <div className="space-y-4">
-              {activityFeed.filter(activity => activity.type === 'reviewed').map((activity, index) => {
-                const movie = findMovieById(activity.movieId);
-                if (!movie) return null;
-                
-                return (
-                  <div key={index} className={`${colorScheme.card} rounded-lg p-4 shadow`}>
-                    <div className="flex items-start">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white mr-3 flex-shrink-0">
-                        <span>{activity.userAvatar}</span>
-                      </div>
-                      
-                      <div className="flex-1">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <p className={`font-medium ${colorScheme.text}`}>
-                              {activity.userName}
-                              <span className={`font-normal ${colorScheme.textSecondary}`}> reviewed</span>
-                            </p>
+            {activityFeed.filter(activity => activity.type === 'reviewed').map((activity, index) => {
+              const movie = findMovieById(activity.movieId);
+              if (!movie) return null;
+              
+              return (
+                <div key={index} className="relative px-5 pt-4 pb-3 border-l-4 border-blue-500">
+                  {/* User info and timestamp */}
+                  <div className="flex items-center mb-3">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white">
+                      <span className="text-xl font-medium">{activity.userAvatar}</span>
+                    </div>
+                    <div className="ml-3">
+                      <p className="font-medium text-white">{activity.userName}</p>
+                      <p className="text-xs text-gray-400">wrote a review</p>
+                    </div>
+                    <div className="ml-auto">
+                      <span className="text-xs text-gray-400">
+                        {formatTimeElapsed(activity.timestamp)}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* Movie card */}
+                  <div className="bg-gray-800 rounded-lg overflow-hidden mb-3">
+                    <div className="flex p-3">
+                      <img 
+                        src={movie.posterUrl} 
+                        alt={movie.title} 
+                        className="w-20 h-28 object-cover rounded-md"
+                      />
+                      <div className="ml-3">
+                        <h4 className="font-medium text-white">{movie.title}</h4>
+                        <div className="flex items-center mt-1 mb-2">
+                          <div className="bg-yellow-500 rounded px-2 py-0.5 text-xs font-bold text-black flex items-center">
+                            <Star className="w-3 h-3 mr-1 fill-current" />
+                            {movie.rating}
                           </div>
-                          <span className={`text-xs ${colorScheme.textSecondary}`}>
-                            {formatTimeElapsed(activity.timestamp)}
-                          </span>
+                          <span className="mx-2 text-xs text-gray-400">•</span>
+                          <span className="text-xs text-gray-400">{movie.year}</span>
                         </div>
-                        
-                        <div 
-                          className={`mt-2 flex rounded-lg overflow-hidden ${darkMode ? 'bg-gray-800' : 'bg-gray-100'} cursor-pointer`}
-                          onClick={() => {
-                            setActiveTab('discover');
-                            showToast(`Selected: ${movie.title}`);
-                          }}
-                        >
-                          <div className="w-16 h-20 bg-gray-300 flex-shrink-0">
-                            <img src={movie.posterUrl} alt={movie.title} className="w-full h-full object-cover" />
-                          </div>
-                          <div className="p-2">
-                            <h4 className={`font-medium text-sm ${colorScheme.text}`}>{movie.title}</h4>
-                            <div className="flex items-center">
-                              <Star className="w-3 h-3 text-yellow-400 fill-current" />
-                              <span className={`text-xs ml-1 ${colorScheme.textSecondary}`}>{movie.rating}</span>
-                              <span className="mx-1">•</span>
-                              <span className={`text-xs ${colorScheme.textSecondary}`}>{movie.year}</span>
-                            </div>
-                            
-                            <div className="mt-1">
-                              <div className="flex">
-                                {Array.from({ length: 5 }).map((_, i) => (
-                                  <Star 
-                                    key={i} 
-                                    className={`w-3 h-3 ${i < Math.round(activity.rating) ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} 
-                                  />
-                                ))}
-                              </div>
-                              <p className={`text-xs mt-1 ${colorScheme.text} italic`}>"{activity.comment}"</p>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="flex mt-3">
-                          <button 
-                            className={`flex items-center mr-4 ${colorScheme.textSecondary} text-xs`}
-                            onClick={() => showToast("Liked!")}
-                          >
-                            <ThumbsUp className="w-4 h-4 mr-1" />
-                            Like
-                          </button>
-                          <button 
-                            className={`flex items-center mr-4 ${colorScheme.textSecondary} text-xs`}
-                            onClick={() => showToast("Commenting...")}
-                          >
-                            <MessageCircle className="w-4 h-4 mr-1" />
-                            Comment
-                          </button>
-                          <button 
-                            className={`flex items-center ${colorScheme.textSecondary} text-xs`}
-                            onClick={() => addToWatchlist(movie)}
-                          >
-                            <Bookmark className="w-4 h-4 mr-1" />
-                            Save
-                          </button>
+                        <div className="flex">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <Star 
+                              key={i} 
+                              className={`w-4 h-4 ${i < Math.round(activity.rating) ? 'text-yellow-400 fill-current' : 'text-gray-600'}`} 
+                            />
+                          ))}
                         </div>
                       </div>
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                  
+                  {/* Review comment */}
+                  {activity.comment && (
+                    <div className="mb-4 px-4 py-3 bg-gray-800 rounded-lg">
+                      <p className="text-sm text-gray-300 italic">"{activity.comment}"</p>
+                    </div>
+                  )}
+                  
+                  {/* Action buttons */}
+                  <div className="flex">
+                    <button 
+                      className="flex-1 flex items-center justify-center py-2 bg-gray-800 text-gray-300 rounded-lg mr-2"
+                      onClick={() => handleViewMovie(movie)}
+                    >
+                      <Eye className="w-4 h-4 mr-2 text-blue-400" />
+                      View
+                    </button>
+                    <button 
+                      className="flex-1 flex items-center justify-center py-2 bg-gray-800 text-gray-300 rounded-lg mr-2"
+                      onClick={() => addToWatchlist(movie)}
+                    >
+                      <Bookmark 
+                        className={`w-4 h-4 mr-2 ${isInWatchlist(movie.id) ? 'text-green-400 fill-current' : 'text-green-400'}`} 
+                      />
+                      Bookmark
+                    </button>
+                    <button 
+                      className="flex-1 flex items-center justify-center py-2 bg-gray-800 text-gray-300 rounded-lg"
+                      onClick={() => handleRateMovie(movie)}
+                    >
+                      <Star 
+                        className={`w-4 h-4 mr-2 ${hasRated(movie.id) ? 'text-yellow-400 fill-current' : 'text-yellow-400'}`} 
+                      />
+                      Rate
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
-        
-        {/* Friends Tab - Enhanced with search */}
+
+        {/* Friends Tab - Empty template */}
         {socialTabView === 'friends' && (
           <div>
             {/* Search Friends Input */}
@@ -410,31 +506,31 @@ const SocialPage = () => {
       
       <BottomNavigation />
       
-      {/* Notifications Modal */}
+      {/* Modals */}
       {notificationsOpen && (
         <NotificationsModal 
           setNotificationsOpen={setNotificationsOpen}
         />
       )}
+
+      {/* Movie Details Modal */}
+      {showMovieDetails && selectedMovie && (
+        <MovieDetailsModal 
+          currentMovie={selectedMovie}
+          setShowDetails={setShowMovieDetails}
+        />
+      )}
+
+      {/* Rate Movie Modal */}
+      {showRateModal && movieToRate && (
+        <RateMovieModal 
+          movieToRate={movieToRate}
+          setShowRateModal={setShowRateModal}
+          onRateSubmit={handleRateSubmit}
+        />
+      )}
     </div>
   );
 };
-
-// Tab Button Component
-const TabButton = ({ label, isActive, onClick, colorScheme, badge = false }) => (
-  <button
-    className={`flex-1 py-2 text-center relative ${
-      isActive 
-        ? `text-purple-500 border-b-2 border-purple-500 font-medium` 
-        : colorScheme.textSecondary
-    }`}
-    onClick={onClick}
-  >
-    {label}
-    {badge && (
-      <span className="absolute top-1 right-1/4 w-2 h-2 bg-red-500 rounded-full"></span>
-    )}
-  </button>
-);
 
 export default SocialPage;
