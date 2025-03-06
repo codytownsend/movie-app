@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Heart, Info, Star, Bookmark } from 'lucide-react';
+import { X, Heart, Info, Star, Bookmark, Sliders } from 'lucide-react';
 import Header from '../components/Header';
 import BottomNavigation from '../components/BottomNavigation';
 import FilterModal from '../modals/FilterModal';
-import NotificationsModal from '../modals/NotificationsModal';
 import MovieDetailsModal from '../modals/MovieDetailsModal';
 import SwipeGuideAnimation from '../components/SwipeGuideAnimation';
 import { useAppContext } from '../context/AppContext';
@@ -26,7 +25,6 @@ const DiscoverPage = () => {
   // Local state
   const [showDetails, setShowDetails] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [direction, setDirection] = useState('');
   const [pullDown, setPullDown] = useState(0);
   const [isPulling, setIsPulling] = useState(false);
@@ -341,11 +339,8 @@ const DiscoverPage = () => {
 
   return (
     <div className={`relative h-screen ${colorScheme.bg} max-w-md mx-auto overflow-hidden`}>
-      {/* Header */}
-      <Header 
-        setFilterOpen={setFilterOpen} 
-        setNotificationsOpen={setNotificationsOpen}
-      />
+      {/* Simplified Header - no filter or notifications */}
+      <Header />
 
       {/* Main content area with fixed height */}
       <div className="h-[calc(100vh-140px)] flex flex-col">
@@ -407,6 +402,17 @@ const DiscoverPage = () => {
               onTouchEnd={handleTouchEnd}
               onMouseDown={handleMouseDown}
             >
+              {/* Filter button - Added to top-left corner of card */}
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFilterOpen(true);
+                }}
+                className="absolute top-6 left-6 z-20 bg-black bg-opacity-50 backdrop-blur-sm rounded-full p-3 text-white shadow-lg hover:bg-opacity-70 transition"
+              >
+                <Sliders className="w-5 h-5" />
+              </button>
+              
               {/* Movie poster */}
               <div className="relative h-full">
                 <img 
@@ -529,12 +535,6 @@ const DiscoverPage = () => {
       {filterOpen && (
         <FilterModal 
           setFilterOpen={setFilterOpen}
-        />
-      )}
-      
-      {notificationsOpen && (
-        <NotificationsModal 
-          setNotificationsOpen={setNotificationsOpen}
         />
       )}
       

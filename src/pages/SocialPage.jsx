@@ -151,10 +151,7 @@ const SocialPage = () => {
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col max-w-md mx-auto overflow-hidden">
       {/* App header */}
-      <Header 
-        setFilterOpen={setFilterOpen} 
-        setNotificationsOpen={setNotificationsOpen}
-      />
+      <Header />
       
       {/* Tab Navigation */}
       <div className="border-b border-gray-800">
