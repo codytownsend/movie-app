@@ -1,6 +1,6 @@
 // src/components/BottomNavigation.jsx
 import React from 'react';
-import { Home, Search, Users, Bookmark, User } from 'lucide-react';
+import { Home, Search, Users, Library, User } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 
 const BottomNavigation = () => {
@@ -40,8 +40,8 @@ const BottomNavigation = () => {
       />
       
       <TabButton 
-        icon={<Bookmark className="w-5 h-5" />}
-        label="Watchlist"
+        icon={<Library className="w-5 h-5" />}
+        label="Library"
         isActive={activeTab === 'watchlist'}
         onClick={() => setActiveTab('watchlist')}
         colorScheme={colorScheme}

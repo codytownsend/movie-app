@@ -3,13 +3,16 @@ import React, { useState, useEffect } from 'react';
 import DiscoverPage from './pages/DiscoverPage';
 import SearchPage from './pages/SearchPage';
 import SocialPage from './pages/SocialPage';
-import WatchlistPage from './pages/WatchlistPage';
+// Import the new MediaLibraryPage instead of WatchlistPage
+import MediaLibraryPage from './pages/MediaLibraryPage';
 import ProfilePage from './pages/ProfilePage';
 import LoadingScreen from './components/LoadingScreen';
 import Toast from './components/Toast';
 import { useAppContext } from './context/AppContext';
 import * as movieService from './services/movieService';
 import { FEATURE_FLAGS } from './config';
+// Import the MediaLibraryProvider
+import MediaLibraryProvider from './context/MediaLibraryContext';
 
 function AppContent() {
   const { 
@@ -87,7 +90,12 @@ function AppContent() {
       case 'social':
         return <SocialPage />;
       case 'watchlist':
-        return <WatchlistPage />;
+        // Use the new MediaLibraryPage component
+        return (
+          <MediaLibraryProvider>
+            <MediaLibraryPage />
+          </MediaLibraryProvider>
+        );
       case 'profile':
         return <ProfilePage />;
       default:

@@ -1,3 +1,4 @@
+// src/pages/DiscoverPage.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Heart, Info, Star, Bookmark, Sliders } from 'lucide-react';
 import Header from '../components/Header';
@@ -28,7 +29,7 @@ const DiscoverPage = () => {
   const [direction, setDirection] = useState('');
   const [pullDown, setPullDown] = useState(0);
   const [isPulling, setIsPulling] = useState(false);
-  const [showInstructions, setShowInstructions] = useState(true);
+  const [showInstructions, setShowInstructions] = useState(false); // Default to false
   
   const currentMovie = movies[currentIndex];
   const cardRef = useRef(null);
@@ -45,10 +46,21 @@ const DiscoverPage = () => {
       setShowInstructions(false);
     } else {
       setShowInstructions(true);
-      // In production app, you would set:
-      // localStorage.setItem('movieMatch_hasSeenInstructions', 'true');
     }
   }, []);
+
+  // Handle animation completion
+  const handleInstructionsComplete = () => {
+    // Save to localStorage that user has seen the instructions
+    localStorage.setItem('movieMatch_hasSeenInstructions', 'true');
+    setShowInstructions(false);
+  };
+
+  // Skip instructions and mark as seen
+  const handleSkipInstructions = () => {
+    localStorage.setItem('movieMatch_hasSeenInstructions', 'true');
+    setShowInstructions(false);
+  };
 
   // Touch/swipe handling
   const handleTouchStart = (e) => {
@@ -390,7 +402,7 @@ const DiscoverPage = () => {
               </div>
             )}
             
-            {/* Current movie card - full screen version */}
+            {/* Current movie card */}
             <div 
               ref={cardRef}
               className={`absolute inset-0 ${colorScheme.card} overflow-hidden transform transition-shadow duration-300 cursor-grab active:cursor-grabbing ${
@@ -521,7 +533,10 @@ const DiscoverPage = () => {
       
       {/* Swipe Guide Animation Overlay */}
       {currentMovie && showInstructions && (
-        <SwipeGuideAnimation onComplete={() => setShowInstructions(false)} />
+        <SwipeGuideAnimation 
+          onComplete={handleInstructionsComplete} 
+          onSkip={handleSkipInstructions}
+        />
       )}
       
       {/* Modals */}
