@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
-  ChevronLeft, Check, Share2, Bookmark, BookmarkCheck, Play, Star, Clock, Calendar, 
+  ChevronLeft, Check, Share, Bookmark, BookmarkCheck, Play, Star, Clock, Calendar, 
   MessageCircle, Eye, EyeOff, X, ThumbsUp, Edit, Send, Trash2,
   ChevronDown, ChevronUp, Heart
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
+import RecommendMovieModal from './RecommendMovieModal';
 
 const MovieDetailsModal = ({ currentMovie, setShowDetails }) => {
   const { 
@@ -34,6 +35,21 @@ const MovieDetailsModal = ({ currentMovie, setShowDetails }) => {
   const [editingReview, setEditingReview] = useState(false);
   const [reviewDraft, setReviewDraft] = useState(userReview);
   const [hoveredRating, setHoveredRating] = useState(0);
+  
+  // New state for recommendation modal
+  const [showRecommendModal, setShowRecommendModal] = useState(false);
+  const [recommendationMessage, setRecommendationMessage] = useState('');
+  const [selectedFriends, setSelectedFriends] = useState([]);
+  // Sample friends data - in a real app this would come from context or props
+  const [userFriends, setUserFriends] = useState([]);
+
+  // Get sample friends when component mounts
+  useEffect(() => {
+    // For demo purposes, import directly
+    import('../data/sampleData').then(module => {
+      setUserFriends(module.sampleUsers.slice(1));
+    });
+  }, []);
   
   const contentRef = useRef(null);
   const reviewInputRef = useRef(null);
@@ -132,6 +148,22 @@ const MovieDetailsModal = ({ currentMovie, setShowDetails }) => {
     } else {
       showToast("Rating removed");
     }
+  };
+
+  // Handle recommendation
+  const handleRecommendMovie = () => {
+    if (selectedFriends.length === 0) {
+      showToast("Please select at least one friend");
+      return;
+    }
+    
+    // In a real app, this would send the recommendation to a server
+    showToast(`Recommended ${currentMovie.title} to ${selectedFriends.length} friend(s)`);
+    
+    // Reset state
+    setShowRecommendModal(false);
+    setRecommendationMessage('');
+    setSelectedFriends([]);
   };
 
   // Start writing a review
@@ -326,10 +358,10 @@ const MovieDetailsModal = ({ currentMovie, setShowDetails }) => {
                   {/* Action buttons */}
                   <div className="flex space-x-1.5">
                     <button
-                      onClick={handleShare}
+                      onClick={() => setShowRecommendModal(true)}
                       className="p-1.5 rounded-full bg-gray-800/90 hover:bg-gray-700/90 transition-colors"
                     >
-                      <Share2 className="w-4 h-4 text-gray-300" />
+                      <Share className="w-4 h-4 text-gray-300" />
                     </button>
                     <button
                       onClick={toggleWatchlist}
@@ -424,6 +456,15 @@ const MovieDetailsModal = ({ currentMovie, setShowDetails }) => {
                       {userRating > 0 ? 'Edit Rating' : 'Rate'}
                     </button>
                   </div>
+
+                  {/* New Recommend Button */}
+                  <button 
+                    onClick={() => setShowRecommendModal(true)}
+                    className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg py-2 text-sm font-medium flex items-center justify-center shadow-sm transition-colors"
+                  >
+                    <Share className="w-4 h-4 mr-1.5" />
+                    Recommend to Friends
+                  </button>
                 </div>
               </div>
             </div>
@@ -860,6 +901,31 @@ const MovieDetailsModal = ({ currentMovie, setShowDetails }) => {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Recommend Movie Modal */}
+      {showRecommendModal && (
+        <div 
+          className="fixed inset-0 z-[70] bg-black/90 backdrop-blur-md flex items-center justify-center px-4 animate-fade-in"
+          onClick={() => setShowRecommendModal(false)}
+        >
+          <div 
+            className="w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <RecommendMovieModal
+              movieToRecommend={currentMovie}
+              recommendationMessage={recommendationMessage}
+              setRecommendationMessage={setRecommendationMessage}
+              userFriends={userFriends}
+              selectedFriends={selectedFriends}
+              setSelectedFriends={setSelectedFriends}
+              handleRecommendMovie={handleRecommendMovie}
+              colorScheme={colorScheme}
+              setRecommendMovieModal={setShowRecommendModal}
+            />
           </div>
         </div>
       )}
