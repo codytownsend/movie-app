@@ -200,10 +200,15 @@ const DiscoverPage = () => {
   const handleAddToWatchlist = () => {
     if (!currentMovie) return;
     
+    if (!currentUser) {
+      showToast("Please log in to save movies");
+      return;
+    }
+    
     const alreadyInWatchlist = watchlist.some(movie => movie.id === currentMovie.id);
     
     if (!alreadyInWatchlist) {
-      setWatchlist(prev => [...prev, currentMovie]);
+      addToWatchlist(currentMovie);
       showToast("Added to watchlist!");
     } else {
       showToast("Already in your watchlist");

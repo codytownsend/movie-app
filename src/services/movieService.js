@@ -27,6 +27,11 @@ const fetchFromAPI = async (endpoint, params = {}) => {
     const response = await fetch(url);
     
     if (!response.ok) {
+      // Added better error handling
+      if (response.status === 401) {
+        console.error("Invalid API key or unauthorized access");
+        throw new Error('Invalid API key');
+      }
       throw new Error(`API request failed: ${response.status}`);
     }
     

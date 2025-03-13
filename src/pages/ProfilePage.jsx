@@ -311,4 +311,15 @@ const ProfilePage = () => {
   );
 };
 
+export const uploadProfilePicture = async (uid, file) => {
+  try {
+    const storageRef = ref(storage, `profile_images/${uid}/${Date.now()}_${file.name}`);
+    await uploadBytes(storageRef, file);
+    return await getDownloadURL(storageRef);
+  } catch (error) {
+    console.error('Error uploading profile picture:', error);
+    throw error;
+  }
+};
+
 export default ProfilePage;

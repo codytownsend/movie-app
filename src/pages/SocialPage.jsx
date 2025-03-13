@@ -145,6 +145,12 @@ const SocialPage = () => {
     }
     
     try {
+      // Check if we're trying to add ourselves
+      if (userId === currentUser.uid) {
+        showToast('You cannot add yourself as a friend');
+        return;
+      }
+      
       await sendFriendRequest(currentUser.uid, userId);
       
       // Update UI
@@ -159,8 +165,11 @@ const SocialPage = () => {
       // Update friend requests
       const updatedRequests = { ...friendRequests };
       const userToAdd = searchResults.find(user => user.uid === userId);
-      updatedRequests.sent.push(userToAdd);
-      setFriendRequests(updatedRequests);
+      
+      if (userToAdd && !updatedRequests.sent.some(req => req.uid === userId)) {
+        updatedRequests.sent.push(userToAdd);
+        setFriendRequests(updatedRequests);
+      }
       
       showToast('Friend request sent!');
     } catch (error) {

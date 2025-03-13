@@ -20,6 +20,34 @@ import { reorderFavorites } from '../services/firebase';
 const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (navigator.msMaxTouchPoints > 0);
 const dndBackend = isTouchDevice ? TouchBackend : HTML5Backend;
 
+
+const handleOfflineMode = () => {
+  if (!navigator.onLine) {
+    showToast("You're offline. Some features may be limited.");
+    // Load data from localStorage if available
+    const cachedWatchlist = localStorage.getItem('cachedWatchlist');
+    if (cachedWatchlist) {
+      try {
+        setWatchlist(JSON.parse(cachedWatchlist));
+      } catch (e) {
+        console.error('Error parsing cached watchlist', e);
+      }
+    }
+  }
+};
+
+// Call this in useEffect
+useEffect(() => {
+  handleOfflineMode();
+  window.addEventListener('online', () => showToast("You're back online!"));
+  window.addEventListener('offline', handleOfflineMode);
+  
+  return () => {
+    window.removeEventListener('online', () => {});
+    window.removeEventListener('offline', handleOfflineMode);
+  };
+}, []);
+
 // Draggable favorite item component
 const DraggableFavoriteItem = ({ movie, index, moveItem, editingFavorites, handleViewDetails }) => {
   const ref = useRef(null);

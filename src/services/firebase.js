@@ -5,7 +5,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
-  updateProfile,
+  updateProfile as updateFirebaseProfile,
   sendPasswordResetEmail,
   onAuthStateChanged
 } from 'firebase/auth';
@@ -26,11 +26,12 @@ import {
   Timestamp,
   writeBatch,
   increment,
-  deleteDoc
+  deleteDoc,
+  addDoc
 } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
-// Your Firebase configuration
+// Your Firebase configuration from environment variables
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -41,11 +42,29 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// Initialize Firebase (safe initialization that prevents duplicate apps)
+let app;
+try {
+  app = initializeApp(firebaseConfig);
+  console.log("Firebase initialized successfully");
+} catch (error) {
+  if (!/already exists/.test(error.message)) {
+    console.error("Firebase initialization error", error.stack);
+  }
+}
+
 const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
+
+/**
+ * Sets up a listener for authentication state changes
+ * @param {function} callback - Function to call when auth state changes
+ * @returns {function} - Unsubscribe function
+ */
+export const onAuthStateChangedListener = (callback) => {
+  return onAuthStateChanged(auth, callback);
+};
 
 // Authentication Functions
 
@@ -56,6 +75,11 @@ const storage = getStorage(app);
  */
 export const checkUsernameAvailability = async (username) => {
   try {
+    // Don't allow usernames that are too short
+    if (username.length < 3) {
+      return false;
+    }
+    
     const usernameQuery = query(
       collection(db, 'usernames'),
       where('username', '==', username.toLowerCase())
@@ -89,7 +113,7 @@ export const registerUser = async (name, email, password, username) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     
     // Update profile with display name
-    await updateProfile(userCredential.user, {
+    await updateFirebaseProfile(userCredential.user, {
       displayName: name
     });
     
@@ -121,6 +145,8 @@ export const registerUser = async (name, email, password, username) => {
         darkMode: true,
         notifications: true,
         emailNotifications: true,
+        textSize: 'medium',
+        animations: true,
         recentActivityPrivacy: 'friends', // 'public', 'friends', 'private'
         recommendationsPrivacy: 'friends'
       }
@@ -166,7 +192,32 @@ export const signInUser = async (email, password) => {
   }
 };
 
-// Keep other authentication functions as is...
+/**
+ * Sign out the current user
+ * @returns {Promise} - Void
+ */
+export const signOutUser = async () => {
+  try {
+    await signOut(auth);
+  } catch (error) {
+    console.error('Error signing out:', error);
+    throw error;
+  }
+};
+
+/**
+ * Send password reset email
+ * @param {string} email - User email
+ * @returns {Promise} - Void
+ */
+export const resetPassword = async (email) => {
+  try {
+    await sendPasswordResetEmail(auth, email);
+  } catch (error) {
+    console.error('Error sending password reset email:', error);
+    throw error;
+  }
+};
 
 // User Profile Functions
 
@@ -289,6 +340,43 @@ export const updateUserProfile = async (uid, data) => {
     await updateDoc(doc(db, 'users', uid), data);
   } catch (error) {
     console.error('Error updating user profile:', error);
+    throw error;
+  }
+};
+
+/**
+ * Upload profile picture to Firebase Storage
+ * @param {string} uid - User ID
+ * @param {File} file - Image file to upload
+ * @returns {Promise<string>} - URL of the uploaded image
+ */
+export const uploadProfilePicture = async (uid, file) => {
+  try {
+    // Create a unique filename
+    const storageRef = ref(storage, `profile_images/${uid}/${Date.now()}_${file.name}`);
+    
+    // Upload the file
+    const snapshot = await uploadBytes(storageRef, file);
+    
+    // Get the download URL
+    const downloadURL = await getDownloadURL(snapshot.ref);
+    
+    // Update the user's profile with the new photo URL
+    await updateDoc(doc(db, 'users', uid), {
+      photoURL: downloadURL
+    });
+    
+    // Also update the Auth profile
+    const currentUser = auth.currentUser;
+    if (currentUser && currentUser.uid === uid) {
+      await updateFirebaseProfile(currentUser, {
+        photoURL: downloadURL
+      });
+    }
+    
+    return downloadURL;
+  } catch (error) {
+    console.error('Error uploading profile picture:', error);
     throw error;
   }
 };
@@ -694,6 +782,28 @@ export const reorderFavorites = async (uid, orderedIds = null) => {
  */
 export const sendFriendRequest = async (senderUid, receiverUid) => {
   try {
+    // Check if users are already friends
+    const senderDoc = await getDoc(doc(db, 'users', senderUid));
+    const receiverDoc = await getDoc(doc(db, 'users', receiverUid));
+    
+    if (!senderDoc.exists() || !receiverDoc.exists()) {
+      throw new Error('User not found');
+    }
+    
+    const senderFriends = senderDoc.data().friends || [];
+    
+    if (senderFriends.includes(receiverUid)) {
+      throw new Error('Already friends with this user');
+    }
+    
+    // Check if request is already pending
+    const senderSentRequests = senderDoc.data().sentRequests || [];
+    const receiverPendingRequests = receiverDoc.data().pendingRequests || [];
+    
+    if (senderSentRequests.includes(receiverUid) || receiverPendingRequests.includes(senderUid)) {
+      throw new Error('Friend request already sent');
+    }
+    
     // Start a batch write
     const batch = writeBatch(db);
     
@@ -731,6 +841,19 @@ export const sendFriendRequest = async (senderUid, receiverUid) => {
  */
 export const acceptFriendRequest = async (accepterUid, requesterUid) => {
   try {
+    // Verify the request exists
+    const accepterDoc = await getDoc(doc(db, 'users', accepterUid));
+    
+    if (!accepterDoc.exists()) {
+      throw new Error('User not found');
+    }
+    
+    const pendingRequests = accepterDoc.data().pendingRequests || [];
+    
+    if (!pendingRequests.includes(requesterUid)) {
+      throw new Error('No pending request from this user');
+    }
+    
     // Start a batch write
     const batch = writeBatch(db);
     
@@ -945,7 +1068,33 @@ export const recommendMovie = async (senderUid, receiverUids, movie, message) =>
       rating: movie.rating
     };
     
-    for (const receiverUid of receiverUids) {
+    // Only process up to 10 receivers at a time to stay within Firestore limits
+    const processedReceivers = receiverUids.slice(0, 10);
+    
+    for (const receiverUid of processedReceivers) {
+      // Make sure receiver exists and accepts recommendations
+      const receiverDoc = await getDoc(doc(db, 'users', receiverUid));
+      if (!receiverDoc.exists()) {
+        continue;
+      }
+      
+      const receiverData = receiverDoc.data();
+      
+      // Check privacy settings
+      const recommendationsPrivacy = receiverData.settings?.recommendationsPrivacy || 'friends';
+      
+      if (recommendationsPrivacy === 'nobody') {
+        continue; // Skip this user
+      }
+      
+      if (recommendationsPrivacy === 'friends') {
+        // Verify friendship
+        const friends = receiverData.friends || [];
+        if (!friends.includes(senderUid)) {
+          continue; // Skip non-friends
+        }
+      }
+      
       // Create recommendation
       const recRef = doc(collection(db, 'users', receiverUid, 'recommendations'));
       batch.set(recRef, {
@@ -967,6 +1116,16 @@ export const recommendMovie = async (senderUid, receiverUids, movie, message) =>
         movieTitle: movie.title,
         createdAt: timestamp,
         read: false
+      });
+      
+      // Add recommendation to sender's sent history
+      const sentRecRef = doc(collection(db, 'users', senderUid, 'sentRecommendations'));
+      batch.set(sentRecRef, {
+        receiverUid,
+        receiverName: receiverData.displayName,
+        movie: movieInfo,
+        message,
+        timestamp
       });
     }
     
@@ -1109,17 +1268,20 @@ export const updateUserSettings = async (uid, settings) => {
   }
 };
 
-// Movie Recommendation Algorithm Functions
+// Movie Recommendation Engine Integration
 
 /**
- * Get personalized movie recommendations
+ * Get personalized movie recommendations for a user
  * @param {string} uid - User ID
  * @param {object} filters - Optional filters
  * @returns {Promise<Array>} - Array of recommended movies
  */
 export const getPersonalizedRecommendations = async (uid, filters = {}) => {
   try {
-    // Get user profile
+    // Import the recommendation engine
+    const recommendationEngine = await import('./RecommendationEngine');
+    
+    // Get user profile data
     const userDoc = await getDoc(doc(db, 'users', uid));
     if (!userDoc.exists()) {
       throw new Error('User not found');
@@ -1130,21 +1292,69 @@ export const getPersonalizedRecommendations = async (uid, filters = {}) => {
     // Get user's movie lists
     const movieLists = await getUserMovieLists(uid);
     
-    // Extract watched movies and ratings
-    const watchedMovies = movieLists.watched;
-    const ratedMovies = watchedMovies.filter(movie => movie.userRating > 0);
+    // Call the recommendation engine
+    try {
+      if (import.meta.env.VITE_TMDB_API_KEY) {
+        const recommendations = await recommendationEngine.getPersonalizedRecommendations(
+          uid, userData, movieLists, filters
+        );
+        
+        if (recommendations && recommendations.length > 0) {
+          // Log recommendations for analytics (optional)
+          try {
+            const recommendationLog = {
+              userId: uid,
+              timestamp: Timestamp.now(),
+              filtersCriteria: filters,
+              recommendationCount: recommendations.length,
+              topRecommendedIds: recommendations.slice(0, 10).map(movie => movie.id)
+            };
+            
+            await addDoc(collection(db, 'recommendationLogs'), recommendationLog);
+          } catch (err) {
+            console.error('Error logging recommendations:', err);
+            // Continue even if logging fails
+          }
+          
+          return recommendations;
+        }
+      }
+    } catch (error) {
+      console.error('Error using recommendation engine:', error);
+      // Fall back to simple recommendations
+    }
     
-    // Get user's favorite genres from profile and watched movies
+    // Fall back to a simpler recommendation algorithm
+    return getSimpleRecommendations(userData, movieLists, filters);
+  } catch (error) {
+    console.error('Error getting personalized recommendations:', error);
+    
+    // Fallback to sample data in case of error
+    const { sampleMovies } = await import('../data/sampleData');
+    return sampleMovies;
+  }
+};
+
+/**
+ * Simplified recommendation algorithm as fallback
+ * @param {object} userData - User profile data
+ * @param {object} movieLists - User's movie lists
+ * @param {object} filters - Optional filters
+ * @returns {Promise<Array>} - Array of recommended movies
+ */
+async function getSimpleRecommendations(userData, movieLists, filters = {}) {
+  try {
+    // Get favorite genres from profile or extract from watch history
     let favoriteGenres = userData.favoriteGenres || [];
     
     // Extract genres from rated movies if user hasn't set preferences
-    if (favoriteGenres.length === 0 && ratedMovies.length > 0) {
+    if (favoriteGenres.length === 0 && movieLists.watched.length > 0) {
       const genreCounts = {};
       
-      ratedMovies.forEach(movie => {
+      movieLists.watched.forEach(movie => {
         const genres = movie.genre || [];
         genres.forEach(genre => {
-          genreCounts[genre] = (genreCounts[genre] || 0) + (movie.userRating / 5);
+          genreCounts[genre] = (genreCounts[genre] || 0) + (movie.userRating ? movie.userRating / 5 : 0.5);
         });
       });
       
@@ -1155,112 +1365,133 @@ export const getPersonalizedRecommendations = async (uid, filters = {}) => {
         .map(([genre]) => genre);
     }
     
-    // Prepare query to TMDB API
-    // For demo purposes, we'll use sample data with filters
+    // Try to get movies from API if key is available
+    try {
+      if (import.meta.env.VITE_TMDB_API_KEY) {
+        // Import movie service functions
+        const { getTrendingMovies, getMoviesByGenre, getGenres } = await import('./movieService');
+        
+        // Get genre IDs
+        const genres = await getGenres();
+        const genreMap = {};
+        genres.forEach(genre => {
+          genreMap[genre.name.toLowerCase()] = genre.id;
+        });
+        
+        let movies = [];
+        
+        // If we have favorite genres, get movies for those genres
+        if (favoriteGenres.length > 0) {
+          for (const genre of favoriteGenres) {
+            const genreId = genreMap[genre.toLowerCase()];
+            if (genreId) {
+              const genreMovies = await getMoviesByGenre(genreId);
+              if (genreMovies.length > 0) {
+                movies = [...movies, ...genreMovies];
+                break; // Stop after getting movies for one genre
+              }
+            }
+          }
+        }
+        
+        // If no genre movies found, use trending
+        if (movies.length === 0) {
+          movies = await getTrendingMovies();
+        }
+        
+        // Filter out duplicates
+        const uniqueMovies = [];
+        const movieIds = new Set();
+        
+        for (const movie of movies) {
+          if (!movieIds.has(movie.id.toString())) {
+            movieIds.add(movie.id.toString());
+            uniqueMovies.push(movie);
+          }
+        }
+        
+        // Filter out movies in user's lists
+        const userMovieIds = new Set([
+          ...movieLists.watchlist.map(m => m.id.toString()),
+          ...movieLists.watched.map(m => m.id.toString())
+        ]);
+        
+        let filteredMovies = uniqueMovies.filter(movie => !userMovieIds.has(movie.id.toString()));
+        
+        // Apply basic filters
+        if (filters.genres && filters.genres.length > 0) {
+          filteredMovies = filteredMovies.filter(movie => 
+            movie.genre && movie.genre.some(g => filters.genres.includes(g))
+          );
+        }
+        
+        if (filters.minRating) {
+          filteredMovies = filteredMovies.filter(movie => movie.rating >= filters.minRating);
+        }
+        
+        if (filters.yearRange) {
+          filteredMovies = filteredMovies.filter(movie => 
+            movie.year >= filters.yearRange[0] && movie.year <= filters.yearRange[1]
+          );
+        }
+        
+        if (filters.services && filters.services.length > 0) {
+          filteredMovies = filteredMovies.filter(movie => 
+            movie.streamingOn && movie.streamingOn.some(s => filters.services.includes(s))
+          );
+        }
+        
+        return filteredMovies;
+      }
+    } catch (error) {
+      console.error('Error getting movies from API:', error);
+      // Fall back to sample data
+    }
+    
+    // If all else fails, use sample data
+    const { sampleMovies } = await import('../data/sampleData');
+    
+    let recommendedMovies = [...sampleMovies];
     
     // Apply filters
-    const { genres, services, minRating, yearRange } = filters;
-    
-    // Get a sample of popular movies (in a real app, this would be from an API)
-    const popularMoviesRef = collection(db, 'movies');
-    let popularMoviesQuery = query(popularMoviesRef, limit(50));
-    
-    // Apply filters if provided
-    if (genres && genres.length > 0) {
-      // This is a simplified version - in Firestore you'd need array-contains-any
-      // which has limitations, so a real implementation would be more complex
-      popularMoviesQuery = query(popularMoviesQuery, where('genres', 'array-contains-any', genres));
-    }
-    
-    if (minRating) {
-      popularMoviesQuery = query(popularMoviesQuery, where('rating', '>=', minRating));
-    }
-    
-    if (yearRange) {
-      popularMoviesQuery = query(
-        popularMoviesQuery, 
-        where('year', '>=', yearRange[0]),
-        where('year', '<=', yearRange[1])
+    if (filters.genres && filters.genres.length > 0) {
+      recommendedMovies = recommendedMovies.filter(movie => 
+        movie.genre && movie.genre.some(g => filters.genres.includes(g))
       );
     }
     
-    const popularMoviesSnapshot = await getDocs(popularMoviesQuery);
-    
-    let recommendedMovies = popularMoviesSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-    
-    // If no results from Firestore (empty collection), use sample movies
-    if (recommendedMovies.length === 0) {
-      // Import sample data
-      const { sampleMovies } = await import('../data/sampleData');
-      
-      recommendedMovies = sampleMovies;
-      
-      // Apply filters
-      if (genres && genres.length > 0) {
-        recommendedMovies = recommendedMovies.filter(movie => 
-          movie.genre.some(g => genres.includes(g))
-        );
-      }
-      
-      if (services && services.length > 0) {
-        recommendedMovies = recommendedMovies.filter(movie => 
-          movie.streamingOn.some(s => services.includes(s))
-        );
-      }
-      
-      if (minRating) {
-        recommendedMovies = recommendedMovies.filter(movie => movie.rating >= minRating);
-      }
-      
-      if (yearRange) {
-        recommendedMovies = recommendedMovies.filter(movie => 
-          movie.year >= yearRange[0] && movie.year <= yearRange[1]
-        );
-      }
+    if (filters.services && filters.services.length > 0) {
+      recommendedMovies = recommendedMovies.filter(movie => 
+        movie.streamingOn && movie.streamingOn.some(s => filters.services.includes(s))
+      );
     }
     
-    // Filter out movies already in user's lists
+    if (filters.minRating) {
+      recommendedMovies = recommendedMovies.filter(movie => movie.rating >= filters.minRating);
+    }
+    
+    if (filters.yearRange) {
+      recommendedMovies = recommendedMovies.filter(movie => 
+        movie.year >= filters.yearRange[0] && movie.year <= filters.yearRange[1]
+      );
+    }
+    
+    // Filter out movies in user's lists
     const userMovieIds = new Set([
-      ...movieLists.watchlist.map(m => m.id),
-      ...movieLists.watched.map(m => m.id)
+      ...movieLists.watchlist.map(m => m.id.toString()),
+      ...movieLists.watched.map(m => m.id.toString())
     ]);
     
     recommendedMovies = recommendedMovies.filter(movie => !userMovieIds.has(movie.id.toString()));
     
-    // Score movies based on user preferences
-    recommendedMovies = recommendedMovies.map(movie => {
-      let score = 0;
-      
-      // Score based on genres
-      const movieGenres = movie.genre || [];
-      const genreMatch = movieGenres.filter(g => favoriteGenres.includes(g)).length;
-      score += genreMatch * 0.2;
-      
-      // Score based on rating
-      score += (movie.rating / 10) * 0.3;
-      
-      // Score based on year (newer = higher score)
-      const currentYear = new Date().getFullYear();
-      const yearScore = 1 - ((currentYear - movie.year) / 100);
-      score += Math.max(0, yearScore) * 0.2;
-      
-      return {
-        ...movie,
-        recommendationScore: score
-      };
-    });
-    
-    // Sort by recommendation score
-    recommendedMovies.sort((a, b) => b.recommendationScore - a.recommendationScore);
-    
     return recommendedMovies;
   } catch (error) {
-    console.error('Error getting personalized recommendations:', error);
-    throw error;
+    console.error('Error getting simple recommendations:', error);
+    
+    // Return empty array as last resort
+    return [];
   }
-};
+}
 
+// Export Firebase instances
 export { auth, db, storage };

@@ -65,30 +65,37 @@ export const AppProvider = ({ children }) => {
 
   // Load user movie lists when user changes
   useEffect(() => {
-    async function loadUserMovieLists() {
-      if (currentUser) {
+  async function loadRecommendations() {
+    if (currentUser) {
+      try {
         setIsLoading(true);
-        try {
-          const lists = await getUserMovieLists(currentUser.uid);
-          setWatchlist(lists.watchlist);
-          setWatchedHistory(lists.watched);
-          setFavoritesList(lists.favorites);
-        } catch (error) {
-          console.error('Error loading user movie lists:', error);
-          showToast('Error loading your movie lists');
-        } finally {
-          setIsLoading(false);
-        }
-      } else {
-        // Reset lists if not logged in
-        setWatchlist([]);
-        setWatchedHistory([]);
-        setFavoritesList([]);
+        const recommendations = await getPersonalizedRecommendations(
+          currentUser.uid, 
+          filterPreferences
+        );
+        setMovies(recommendations);
+      } catch (error) {
+        console.error('Error loading recommendations:', error);
+        // Fall back to sample data
+        const { sampleMovies } = await import('../data/sampleData');
+        setMovies(sampleMovies);
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      // Load sample data if not logged in
+      try {
+        const { sampleMovies } = await import('../data/sampleData');
+        setMovies(sampleMovies);
+      } catch (error) {
+        console.error('Error loading sample data:', error);
+        setMovies([]);
       }
     }
-    
-    loadUserMovieLists();
-  }, [currentUser]);
+  }
+  
+  loadRecommendations();
+}, [currentUser, userProfile, filterPreferences]);
   
   // Load recommendations when user profile changes
   useEffect(() => {

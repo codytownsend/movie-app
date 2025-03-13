@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useAppContext } from '../context/AppContext';
 import { Check, X, Loader } from 'lucide-react';
+import { checkUsernameAvailability } from '../services/firebase';
 
 const RegisterPage = ({ switchToLogin }) => {
   const { register, error, isAuthenticating } = useAuth();
@@ -60,52 +61,55 @@ const RegisterPage = ({ switchToLogin }) => {
     e.preventDefault();
     setLocalError('');
     
-    // Basic validation
-    if (!name.trim()) {
-      setLocalError('Name is required');
-      return;
-    }
-    
-    if (!email.trim()) {
-      setLocalError('Email is required');
-      return;
-    }
-    
-    if (!username.trim()) {
-      setLocalError('Username is required');
-      return;
-    }
-    
-    if (username.length < 3) {
-      setLocalError('Username must be at least 3 characters');
-      return;
-    }
-    
-    if (!usernameAvailable && usernameChecked) {
-      setLocalError('Username is already taken');
-      return;
-    }
-    
-    if (!password.trim()) {
-      setLocalError('Password is required');
-      return;
-    }
-    
-    if (password.length < 6) {
-      setLocalError('Password must be at least 6 characters');
-      return;
-    }
-    
-    if (password !== confirmPassword) {
-      setLocalError('Passwords do not match');
-      return;
-    }
-    
     try {
+      // Validate fields
+      if (!name.trim()) {
+        setLocalError('Name is required');
+        return;
+      }
+      
+      if (!username.trim()) {
+        setLocalError('Username is required');
+        return;
+      }
+      
+      if (username.length < 3) {
+        setLocalError('Username must be at least 3 characters');
+        return;
+      }
+      
+      if (!usernameAvailable && usernameChecked) {
+        setLocalError('Username is already taken');
+        return;
+      }
+      
+      if (!email.trim()) {
+        setLocalError('Email is required');
+        return;
+      }
+      
+      // Add email format validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        setLocalError('Please enter a valid email address');
+        return;
+      }
+      
+      if (password.length < 6) {
+        setLocalError('Password must be at least 6 characters');
+        return;
+      }
+      
+      if (password !== confirmPassword) {
+        setLocalError('Passwords do not match');
+        return;
+      }
+      
       await register(name, email, password, username);
       showToast('Account created successfully!');
     } catch (err) {
-      setLocalError(err.message);
+      console.error('Registration error:', err);
+      setLocalError(err.message || 'Error creating account');
     }
   };
 
