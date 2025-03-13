@@ -10,7 +10,7 @@ import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import SettingsModal from '../modals/SettingsModal';
 import EditProfileModal from '../modals/EditProfileModal';
-import { uploadProfilePicture } from '../services/firebase';
+import { uploadProfilePicture as uploadProfileImage } from '../services/firebase';
 
 const ProfilePage = () => {
   const { 
@@ -63,7 +63,7 @@ const ProfilePage = () => {
       setIsUpdating(true);
       
       // Upload to Firebase Storage
-      const downloadUrl = await uploadProfilePicture(currentUser.uid, file);
+      const downloadUrl = await uploadProfileImage(currentUser.uid, file);
       
       // Update profile state
       setProfileImageUrl(downloadUrl);
@@ -309,17 +309,6 @@ const ProfilePage = () => {
       )}
     </div>
   );
-};
-
-export const uploadProfilePicture = async (uid, file) => {
-  try {
-    const storageRef = ref(storage, `profile_images/${uid}/${Date.now()}_${file.name}`);
-    await uploadBytes(storageRef, file);
-    return await getDownloadURL(storageRef);
-  } catch (error) {
-    console.error('Error uploading profile picture:', error);
-    throw error;
-  }
 };
 
 export default ProfilePage;
