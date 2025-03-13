@@ -1,22 +1,13 @@
-// src/context/AuthContext.js
+// src/context/AuthContext.jsx
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { sampleUsers } from '../data/sampleData';
-
-// Demo user account
-const demoUser = {
-  id: 0,
-  name: "Cody",
-  email: "cody@email.com",
-  password: "password", // This would be hashed in a real app
-  username: "cody",
-  avatar: "C",
-  bio: "Movie Enthusiast | Cinema Lover",
-  following: 112,
-  followers: 89,
-  favoriteGenres: ["Action", "Sci-Fi", "Thriller", "Comedy"],
-  streamingServices: ["Netflix", "Prime Video", "Disney+"],
-  recentActivity: []
-};
+import { 
+  onAuthStateChangedListener, 
+  signInUser, 
+  registerUser, 
+  signOutUser,
+  getUserProfile,
+  updateUserProfile
+} from '../services/firebase';
 
 // Create context
 const AuthContext = createContext();
@@ -27,29 +18,35 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider = ({ children }) => {
   // Auth state
   const [currentUser, setCurrentUser] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
   const [isAuthenticating, setIsAuthenticating] = useState(true);
   const [error, setError] = useState(null);
   
-  // Check if user is already logged in (via localStorage)
+  // Set up auth state listener
   useEffect(() => {
-    const checkAuth = async () => {
+    const unsubscribe = onAuthStateChangedListener(async (user) => {
       try {
-        const savedUser = localStorage.getItem('currentUser');
-        if (savedUser) {
-          setCurrentUser(JSON.parse(savedUser));
+        if (user) {
+          // User is signed in
+          const userProfileData = await getUserProfile(user.uid);
+          
+          setCurrentUser(user);
+          setUserProfile(userProfileData);
         } else {
+          // User is signed out
           setCurrentUser(null);
+          setUserProfile(null);
         }
       } catch (err) {
-        console.error('Error checking authentication:', err);
-        setError('An error occurred while checking your authentication status.');
-        setCurrentUser(null);
+        console.error('Error in auth state change:', err);
+        setError(err.message);
       } finally {
         setIsAuthenticating(false);
       }
-    };
+    });
     
-    checkAuth();
+    // Clean up subscription
+    return () => unsubscribe();
   }, []);
   
   // Login function
@@ -58,36 +55,15 @@ export const AuthProvider = ({ children }) => {
     setError(null);
     
     try {
-      // Check for demo account first
-      if (email === demoUser.email && password === demoUser.password) {
-        // Demo login successful
-        const { password: _, ...userWithoutPassword } = demoUser;
-        
-        // Save to localStorage
-        localStorage.setItem('currentUser', JSON.stringify(userWithoutPassword));
-        
-        setCurrentUser(userWithoutPassword);
-        return userWithoutPassword;
-      }
+      const userCredential = await signInUser(email, password);
+      const userProfile = await getUserProfile(userCredential.user.uid);
       
-      // Otherwise check sample users
-      const user = sampleUsers.find(user => 
-        user.email === email && user.password === password
-      );
+      setCurrentUser(userCredential.user);
+      setUserProfile(userProfile);
       
-      if (!user) {
-        throw new Error('Invalid email or password');
-      }
-      
-      // Remove password before storing
-      const { password: _, ...userWithoutPassword } = user;
-      
-      // Save to localStorage
-      localStorage.setItem('currentUser', JSON.stringify(userWithoutPassword));
-      
-      setCurrentUser(userWithoutPassword);
-      return userWithoutPassword;
+      return userCredential.user;
     } catch (err) {
+      console.error('Login error:', err);
       setError(err.message);
       throw err;
     } finally {
@@ -96,39 +72,22 @@ export const AuthProvider = ({ children }) => {
   };
   
   // Register function
-  const register = async (name, email, password) => {
+  const register = async (name, email, password, username) => {
     setIsAuthenticating(true);
     setError(null);
     
     try {
-      // Check if email already exists
-      const existingUser = sampleUsers.find(user => user.email === email);
+      // Check if username is available before registering
+      // This would be handled in the registerUser function in firebase.js
+      const userCredential = await registerUser(name, email, password, username);
+      const userProfile = await getUserProfile(userCredential.user.uid);
       
-      if (existingUser) {
-        throw new Error('Email already in use');
-      }
+      setCurrentUser(userCredential.user);
+      setUserProfile(userProfile);
       
-      // Create new user
-      const newUser = {
-        id: sampleUsers.length + 1,
-        name,
-        email,
-        username: email.split('@')[0],
-        avatar: name.charAt(0).toUpperCase(),
-        bio: "Movie Enthusiast",
-        following: 0,
-        followers: 0,
-        favoriteGenres: [],
-        streamingServices: [],
-        recentActivity: []
-      };
-      
-      // Save to localStorage (in a real app, this would be saved to a database)
-      localStorage.setItem('currentUser', JSON.stringify(newUser));
-      
-      setCurrentUser(newUser);
-      return newUser;
+      return userCredential.user;
     } catch (err) {
+      console.error('Registration error:', err);
       setError(err.message);
       throw err;
     } finally {
@@ -137,25 +96,33 @@ export const AuthProvider = ({ children }) => {
   };
   
   // Logout function
-  const logout = () => {
-    localStorage.removeItem('currentUser');
-    setCurrentUser(null);
+  const logout = async () => {
+    try {
+      await signOutUser();
+      setCurrentUser(null);
+      setUserProfile(null);
+    } catch (err) {
+      console.error('Logout error:', err);
+      setError(err.message);
+      throw err;
+    }
   };
   
-  // Update user profile
-  const updateProfile = (updates) => {
+  // Update profile function
+  const updateProfile = async (updates) => {
     setIsAuthenticating(true);
     setError(null);
     
     try {
-      const updatedUser = { ...currentUser, ...updates };
+      await updateUserProfile(currentUser.uid, updates);
       
-      // Save to localStorage
-      localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+      // Get the updated profile
+      const updatedProfile = await getUserProfile(currentUser.uid);
+      setUserProfile(updatedProfile);
       
-      setCurrentUser(updatedUser);
-      return updatedUser;
+      return updatedProfile;
     } catch (err) {
+      console.error('Update profile error:', err);
       setError(err.message);
       throw err;
     } finally {
@@ -165,12 +132,14 @@ export const AuthProvider = ({ children }) => {
   
   const contextValue = {
     currentUser,
+    userProfile,
     isAuthenticating,
     error,
     login,
     register,
     logout,
-    updateProfile
+    updateProfile,
+    setError
   };
 
   return (

@@ -1,7 +1,9 @@
 // src/modals/SettingsModal.jsx
-import React from 'react';
-import { X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Moon, Sun, Bell, Eye, EyeOff, Save, Loader } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
+import { updateUserSettings } from '../services/firebase';
 
 const SettingsModal = ({ setShowSettingsModal }) => {
   const { 
@@ -10,105 +12,353 @@ const SettingsModal = ({ setShowSettingsModal }) => {
     setDarkMode, 
     showToast 
   } = useAppContext();
+  
+  const { currentUser, userProfile } = useAuth();
+  
+  // Local settings state
+  const [settings, setSettings] = useState({
+    darkMode: darkMode,
+    notifications: true,
+    emailNotifications: true,
+    textSize: 'medium',
+    animations: true,
+    recentActivityPrivacy: 'friends',
+    recommendationsPrivacy: 'friends'
+  });
+  
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Update local settings from user profile when it changes
+  useEffect(() => {
+    if (userProfile?.settings) {
+      setSettings(prev => ({
+        ...prev,
+        ...userProfile.settings,
+        darkMode // Always use the current app darkMode state
+      }));
+    }
+  }, [userProfile, darkMode]);
+  
+  // Handle settings change
+  const handleSettingChange = (setting, value) => {
+    setSettings(prev => ({
+      ...prev,
+      [setting]: value
+    }));
+    
+    // For dark mode, update the app state immediately for preview
+    if (setting === 'darkMode') {
+      setDarkMode(value);
+    }
+  };
+  
+  // Save settings
+  const handleSaveSettings = async () => {
+    if (!currentUser) {
+      showToast('Please log in to save settings');
+      setShowSettingsModal(false);
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      await updateUserSettings(currentUser.uid, settings);
+      showToast('Settings saved successfully');
+      setShowSettingsModal(false);
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      showToast('Error saving settings');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center" onClick={() => setShowSettingsModal(false)}>
-      <div 
-        className={`${colorScheme.card} w-11/12 max-w-md rounded-2xl overflow-hidden max-h-[90vh] overflow-y-auto`}
+    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-end justify-center"
+      onClick={() => setShowSettingsModal(false)}
+    >
+      <div
+        className={`${colorScheme.card} w-full max-w-md md:max-w-lg rounded-t-3xl overflow-hidden transition-all duration-300 shadow-2xl`}
+        style={{ maxHeight: '92vh' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-5">
-          <div className="flex justify-between items-center mb-5">
-            <h2 className={`text-xl font-bold ${colorScheme.text}`}>Appearance Settings</h2>
+        {/* Pull indicator */}
+        <div className="w-full py-2 flex justify-center">
+          <div className="w-10 h-1 bg-gray-500/40 rounded-full"></div>
+        </div>
+        
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className={`text-xl font-bold ${colorScheme.text}`}>Settings</h2>
             <button 
               onClick={() => setShowSettingsModal(false)}
-              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              className={`w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors`}
             >
-              <X className={`w-6 h-6 ${colorScheme.text}`} />
+              <X className={`w-5 h-5 ${colorScheme.text}`} />
             </button>
           </div>
           
-          <div className="mb-5">
-            <h3 className={`font-medium mb-3 ${colorScheme.text}`}>Theme</h3>
-            <div className="flex flex-col space-y-4">
-              <div 
-                className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}
-                onClick={() => setDarkMode(true)}
-              >
-                <div className="flex items-center">
-                  <div className="w-10 h-10 bg-gray-900 rounded-full flex items-center justify-center mr-3">
-                    <span className="text-white text-lg">🌙</span>
+          <div className="space-y-6">
+            {/* Theme Setting */}
+            <div>
+              <h3 className={`font-medium mb-4 ${colorScheme.text}`}>Theme</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div 
+                  className={`flex items-center p-4 rounded-xl cursor-pointer transition-colors ${
+                    settings.darkMode 
+                      ? 'bg-gray-800 border-2 border-purple-500' 
+                      : 'bg-gray-100 dark:bg-gray-700 border-2 border-transparent'
+                  }`}
+                  onClick={() => handleSettingChange('darkMode', true)}
+                >
+                  <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center mr-3">
+                    <Moon className="w-5 h-5 text-purple-300" />
                   </div>
                   <div>
-                    <h4 className={`font-medium ${colorScheme.text}`}>Dark Mode</h4>
-                    <p className={`text-xs ${colorScheme.textSecondary}`}>Easier on the eyes in low light</p>
+                    <h4 className={`font-medium ${colorScheme.text}`}>Dark</h4>
+                    <p className={`text-xs ${colorScheme.textSecondary}`}>Easier on the eyes</p>
                   </div>
                 </div>
-                {darkMode && <div className="w-5 h-5 rounded-full bg-purple-500"></div>}
-              </div>
-              
-              <div 
-                className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors ${!darkMode ? 'bg-gray-200' : 'bg-gray-700'}`}
-                onClick={() => setDarkMode(false)}
-              >
-                <div className="flex items-center">
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                    <span className="text-lg">☀️</span>
+                
+                <div 
+                  className={`flex items-center p-4 rounded-xl cursor-pointer transition-colors ${
+                    !settings.darkMode 
+                      ? 'bg-white border-2 border-purple-500' 
+                      : 'bg-gray-100 dark:bg-gray-700 border-2 border-transparent'
+                  }`}
+                  onClick={() => handleSettingChange('darkMode', false)}
+                >
+                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-3">
+                    <Sun className="w-5 h-5 text-yellow-500" />
                   </div>
                   <div>
-                    <h4 className={`font-medium ${colorScheme.text}`}>Light Mode</h4>
-                    <p className={`text-xs ${colorScheme.textSecondary}`}>Better visibility in bright light</p>
+                    <h4 className={`font-medium ${colorScheme.text}`}>Light</h4>
+                    <p className={`text-xs ${colorScheme.textSecondary}`}>For brighter environments</p>
                   </div>
                 </div>
-                {!darkMode && <div className="w-5 h-5 rounded-full bg-purple-500"></div>}
               </div>
             </div>
-          </div>
-          
-          <div className="mb-5">
-            <h3 className={`font-medium mb-3 ${colorScheme.text}`}>Text Size</h3>
-            <div className="px-2">
-              <input 
-                type="range" 
-                min="1" 
-                max="5" 
-                step="1" 
-                defaultValue="3"
-                className="w-full accent-purple-500"
-              />
-              <div className="flex justify-between text-xs mt-1">
-                <span className={colorScheme.textSecondary}>A</span>
-                <span className={colorScheme.textSecondary}>AA</span>
-                <span className={colorScheme.textSecondary}>AAA</span>
+            
+            {/* Notifications Settings */}
+            <div>
+              <h3 className={`font-medium mb-4 ${colorScheme.text}`}>Notifications</h3>
+              <div className={`${colorScheme.bg} border ${colorScheme.border} rounded-xl overflow-hidden`}>
+                <div className="p-4 flex items-center justify-between border-b border-gray-100 dark:border-gray-800">
+                  <div>
+                    <h4 className={`font-medium ${colorScheme.text}`}>App Notifications</h4>
+                    <p className={`text-xs ${colorScheme.textSecondary} mt-1`}>
+                      Recommendations, friend requests, etc.
+                    </p>
+                  </div>
+                  <div className="relative">
+                    <input 
+                      type="checkbox" 
+                      id="app-notifications" 
+                      className="sr-only peer" 
+                      checked={settings.notifications}
+                      onChange={(e) => handleSettingChange('notifications', e.target.checked)}
+                    />
+                    <div className="w-11 h-6 bg-gray-400 rounded-full peer dark:bg-gray-700 peer-checked:bg-purple-500 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                  </div>
+                </div>
+                
+                <div className="p-4 flex items-center justify-between">
+                  <div>
+                    <h4 className={`font-medium ${colorScheme.text}`}>Email Notifications</h4>
+                    <p className={`text-xs ${colorScheme.textSecondary} mt-1`}>
+                      Weekly digest and important updates
+                    </p>
+                  </div>
+                  <div className="relative">
+                    <input 
+                      type="checkbox" 
+                      id="email-notifications" 
+                      className="sr-only peer" 
+                      checked={settings.emailNotifications}
+                      onChange={(e) => handleSettingChange('emailNotifications', e.target.checked)}
+                    />
+                    <div className="w-11 h-6 bg-gray-400 rounded-full peer dark:bg-gray-700 peer-checked:bg-purple-500 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-          
-          <div className="mb-5">
-            <h3 className={`font-medium mb-3 ${colorScheme.text}`}>Animations</h3>
-            <div className={`${darkMode ? 'bg-gray-800' : 'bg-gray-200'} p-3 rounded-lg`}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className={`font-medium ${colorScheme.text}`}>Enable animations</h4>
-                  <p className={`text-xs ${colorScheme.textSecondary}`}>Card swipes, transitions, and effects</p>
+            
+            {/* Text Size Setting */}
+            <div>
+              <h3 className={`font-medium mb-4 ${colorScheme.text}`}>Text Size</h3>
+              <div className="mb-2">
+                <div className="flex justify-between items-center mb-2">
+                  <span className={`text-xs ${colorScheme.textSecondary}`}>Small</span>
+                  <span className={`text-xs ${colorScheme.textSecondary}`}>Large</span>
                 </div>
                 <div className="relative">
-                  <input type="checkbox" id="animations" className="sr-only peer" defaultChecked />
-                  <div className="w-11 h-6 bg-gray-400 rounded-full peer peer-checked:bg-purple-500 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                  <div className={`h-1 w-full ${colorScheme.border} rounded-full`}></div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="2"
+                    value={settings.textSize === 'small' ? 0 : settings.textSize === 'medium' ? 1 : 2}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value);
+                      handleSettingChange('textSize', value === 0 ? 'small' : value === 1 ? 'medium' : 'large');
+                    }}
+                    className="absolute top-0 w-full h-1 opacity-0 cursor-pointer"
+                  />
+                  <div 
+                    className="absolute top-[-3px] w-3 h-3 bg-purple-500 rounded-full"
+                    style={{ 
+                      left: `${settings.textSize === 'small' ? 0 : settings.textSize === 'medium' ? 50 : 100}%`,
+                      transform: 'translateX(-50%)'
+                    }}
+                  ></div>
+                </div>
+                <div className="flex justify-center mt-1">
+                  <span className={`text-sm font-medium ${colorScheme.text}`}>
+                    {settings.textSize === 'small' ? 'Small' : settings.textSize === 'medium' ? 'Medium' : 'Large'}
+                  </span>
                 </div>
               </div>
             </div>
-          </div>
-          
-          <div className="mt-8">
-            <button 
-              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white font-medium rounded-lg py-3 transition transform hover:scale-[1.02] active:scale-[0.98]"
-              onClick={() => {
-                setShowSettingsModal(false);
-                showToast("Settings saved");
-              }}
+            
+            {/* Animation Settings */}
+            <div>
+              <h3 className={`font-medium mb-4 ${colorScheme.text}`}>Animations</h3>
+              <div className={`${colorScheme.bg} border ${colorScheme.border} rounded-xl overflow-hidden`}>
+                <div className="p-4 flex items-center justify-between">
+                  <div>
+                    <h4 className={`font-medium ${colorScheme.text}`}>Enable Animations</h4>
+                    <p className={`text-xs ${colorScheme.textSecondary} mt-1`}>
+                      Card swipes, transitions, and effects
+                    </p>
+                  </div>
+                  <div className="relative">
+                    <input 
+                      type="checkbox" 
+                      id="animations" 
+                      className="sr-only peer" 
+                      checked={settings.animations}
+                      onChange={(e) => handleSettingChange('animations', e.target.checked)}
+                    />
+                    <div className="w-11 h-6 bg-gray-400 rounded-full peer dark:bg-gray-700 peer-checked:bg-purple-500 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Privacy Settings */}
+            <div>
+              <h3 className={`font-medium mb-4 ${colorScheme.text}`}>Privacy</h3>
+              <div className={`${colorScheme.bg} border ${colorScheme.border} rounded-xl overflow-hidden`}>
+                <div className="p-4 border-b border-gray-100 dark:border-gray-800">
+                  <h4 className={`font-medium ${colorScheme.text} mb-2`}>Recent Activity Privacy</h4>
+                  <p className={`text-xs ${colorScheme.textSecondary} mb-3`}>
+                    Who can see your recently watched and liked movies
+                  </p>
+                  <div className="flex flex-col space-y-2">
+                    <label className="flex items-center cursor-pointer">
+                      <input 
+                        type="radio" 
+                        name="activity-privacy" 
+                        value="public"
+                        checked={settings.recentActivityPrivacy === 'public'}
+                        onChange={() => handleSettingChange('recentActivityPrivacy', 'public')}
+                        className="sr-only peer"
+                      />
+                      <div className="w-4 h-4 rounded-full border border-gray-300 dark:border-gray-600 mr-2 peer-checked:border-purple-500 peer-checked:border-4"></div>
+                      <span className={colorScheme.text}>Public</span>
+                    </label>
+                    <label className="flex items-center cursor-pointer">
+                      <input 
+                        type="radio" 
+                        name="activity-privacy" 
+                        value="friends"
+                        checked={settings.recentActivityPrivacy === 'friends'}
+                        onChange={() => handleSettingChange('recentActivityPrivacy', 'friends')}
+                        className="sr-only peer"
+                      />
+                      <div className="w-4 h-4 rounded-full border border-gray-300 dark:border-gray-600 mr-2 peer-checked:border-purple-500 peer-checked:border-4"></div>
+                      <span className={colorScheme.text}>Friends Only</span>
+                    </label>
+                    <label className="flex items-center cursor-pointer">
+                      <input 
+                        type="radio" 
+                        name="activity-privacy" 
+                        value="private"
+                        checked={settings.recentActivityPrivacy === 'private'}
+                        onChange={() => handleSettingChange('recentActivityPrivacy', 'private')}
+                        className="sr-only peer"
+                      />
+                      <div className="w-4 h-4 rounded-full border border-gray-300 dark:border-gray-600 mr-2 peer-checked:border-purple-500 peer-checked:border-4"></div>
+                      <span className={colorScheme.text}>Private</span>
+                    </label>
+                  </div>
+                </div>
+                
+                <div className="p-4">
+                  <h4 className={`font-medium ${colorScheme.text} mb-2`}>Recommendations Privacy</h4>
+                  <p className={`text-xs ${colorScheme.textSecondary} mb-3`}>
+                    Who can send you movie recommendations
+                  </p>
+                  <div className="flex flex-col space-y-2">
+                    <label className="flex items-center cursor-pointer">
+                      <input 
+                        type="radio" 
+                        name="recommendation-privacy" 
+                        value="public"
+                        checked={settings.recommendationsPrivacy === 'public'}
+                        onChange={() => handleSettingChange('recommendationsPrivacy', 'public')}
+                        className="sr-only peer"
+                      />
+                      <div className="w-4 h-4 rounded-full border border-gray-300 dark:border-gray-600 mr-2 peer-checked:border-purple-500 peer-checked:border-4"></div>
+                      <span className={colorScheme.text}>Everyone</span>
+                    </label>
+                    <label className="flex items-center cursor-pointer">
+                      <input 
+                        type="radio" 
+                        name="recommendation-privacy" 
+                        value="friends"
+                        checked={settings.recommendationsPrivacy === 'friends'}
+                        onChange={() => handleSettingChange('recommendationsPrivacy', 'friends')}
+                        className="sr-only peer"
+                      />
+                      <div className="w-4 h-4 rounded-full border border-gray-300 dark:border-gray-600 mr-2 peer-checked:border-purple-500 peer-checked:border-4"></div>
+                      <span className={colorScheme.text}>Friends Only</span>
+                    </label>
+                    <label className="flex items-center cursor-pointer">
+                      <input 
+                        type="radio" 
+                        name="recommendation-privacy" 
+                        value="private"
+                        checked={settings.recommendationsPrivacy === 'private'}
+                        onChange={() => handleSettingChange('recommendationsPrivacy', 'private')}
+                        className="sr-only peer"
+                      />
+                      <div className="w-4 h-4 rounded-full border border-gray-300 dark:border-gray-600 mr-2 peer-checked:border-purple-500 peer-checked:border-4"></div>
+                      <span className={colorScheme.text}>Nobody</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Save Button */}
+            <button
+              className="w-full py-3 px-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-medium shadow-md hover:shadow-lg transition-all flex items-center justify-center"
+              onClick={handleSaveSettings}
+              disabled={isSubmitting}
             >
-              Save Settings
+              {isSubmitting ? (
+                <>
+                  <Loader className="w-5 h-5 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="w-5 h-5 mr-2" />
+                  Save Settings
+                </>
+              )}
             </button>
           </div>
         </div>

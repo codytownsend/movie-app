@@ -1,36 +1,78 @@
 // src/modals/RecommendMovieModal.jsx
-import React, { useState } from 'react';
-import { X, Star, Send, MessageSquare, Users, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Star, Send, MessageSquare, Users, ChevronRight, Loader, Check } from 'lucide-react';
+import { useAppContext } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
+import { getUserFriends, recommendMovie } from '../services/firebase';
 
-const RecommendMovieModal = ({
-  movieToRecommend,
-  recommendationMessage,
-  setRecommendationMessage,
-  userFriends,
-  selectedFriends,
-  setSelectedFriends,
-  handleRecommendMovie,
-  colorScheme,
-  setRecommendMovieModal
-}) => {
-  const [submitting, setSubmitting] = useState(false);
+const RecommendMovieModal = ({ movieToRecommend, setShowRecommendModal }) => {
+  const { colorScheme, showToast } = useAppContext();
+  const { currentUser } = useAuth();
+  
+  const [recommendationMessage, setRecommendationMessage] = useState('');
+  const [userFriends, setUserFriends] = useState([]);
+  const [selectedFriends, setSelectedFriends] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeStep, setActiveStep] = useState(1); // 1: Movie info, 2: Friends selection
+  
+  // Load friends
+  useEffect(() => {
+    const loadFriends = async () => {
+      if (!currentUser) return;
+      
+      setIsLoading(true);
+      
+      try {
+        const friends = await getUserFriends(currentUser.uid);
+        setUserFriends(friends);
+      } catch (error) {
+        console.error('Error loading friends:', error);
+        showToast('Error loading friends');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadFriends();
+  }, [currentUser]);
 
-  if (!movieToRecommend) return null;
-
-  const handleSubmit = () => {
-    setSubmitting(true);
-    // Simulate a brief loading state for better UX
-    setTimeout(() => {
-      handleRecommendMovie();
-      setSubmitting(false);
-    }, 600);
+  // Handle recommendation submission
+  const handleRecommendMovie = async () => {
+    if (!currentUser) {
+      showToast('Please log in to recommend movies');
+      return;
+    }
+    
+    if (selectedFriends.length === 0) {
+      showToast('Please select at least one friend');
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      await recommendMovie(
+        currentUser.uid, 
+        selectedFriends,
+        movieToRecommend,
+        recommendationMessage
+      );
+      
+      showToast(`Recommended to ${selectedFriends.length} ${selectedFriends.length === 1 ? 'friend' : 'friends'}`);
+      setShowRecommendModal(false);
+    } catch (error) {
+      console.error('Error recommending movie:', error);
+      showToast('Error sending recommendation');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div 
       className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" 
-      onClick={() => setRecommendMovieModal(false)}
+      onClick={() => setShowRecommendModal(false)}
     >
       <div 
         className={`${colorScheme.card} w-full max-w-md rounded-2xl overflow-hidden shadow-xl transition-all`}
@@ -46,7 +88,7 @@ const RecommendMovieModal = ({
           <div className="relative px-5 py-4 flex justify-between items-center">
             <h2 className="text-lg font-bold text-white">Share with Friends</h2>
             <button 
-              onClick={() => setRecommendMovieModal(false)}
+              onClick={() => setShowRecommendModal(false)}
               className="rounded-full bg-white/20 p-1.5 hover:bg-white/30 transition-colors"
               aria-label="Close"
             >
@@ -98,7 +140,7 @@ const RecommendMovieModal = ({
                     <span className={`text-xs ${colorScheme.textSecondary}`}>{movieToRecommend.year}</span>
                   </div>
                   <div className="flex flex-wrap">
-                    {movieToRecommend.genre.slice(0, 3).map((g, i) => (
+                    {movieToRecommend.genre && movieToRecommend.genre.slice(0, 3).map((g, i) => (
                       <span 
                         key={i} 
                         className="text-xs bg-gray-100 dark:bg-gray-800 rounded-full px-2 py-0.5 mr-1.5 mb-1.5"
@@ -123,6 +165,7 @@ const RecommendMovieModal = ({
                     placeholder="This movie reminds me of our conversation about..."
                     value={recommendationMessage}
                     onChange={(e) => setRecommendationMessage(e.target.value)}
+                    maxLength={200}
                   ></textarea>
                   <div className="absolute bottom-2 right-2 text-xs text-gray-400">
                     {recommendationMessage.length}/200
@@ -157,42 +200,65 @@ const RecommendMovieModal = ({
                   </span>
                 </div>
 
-                <div className="space-y-2">
-                  {userFriends.map(friend => (
-                    <div 
-                      key={friend.id} 
-                      className={`flex items-center p-3 rounded-xl transition-all ${
-                        selectedFriends.includes(friend.id) 
-                          ? 'bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800' 
-                          : `border ${colorScheme.border}`
-                      }`}
+                {isLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500"></div>
+                  </div>
+                ) : userFriends.length > 0 ? (
+                  <div className="space-y-2">
+                    {userFriends.map(friend => (
+                      <div 
+                        key={friend.uid} 
+                        className={`flex items-center p-3 rounded-xl transition-all ${
+                          selectedFriends.includes(friend.uid) 
+                            ? 'bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800' 
+                            : `border ${colorScheme.border}`
+                        }`}
+                        onClick={() => {
+                          if (selectedFriends.includes(friend.uid)) {
+                            setSelectedFriends(selectedFriends.filter(id => id !== friend.uid));
+                          } else {
+                            setSelectedFriends([...selectedFriends, friend.uid]);
+                          }
+                        }}
+                      >
+                        <div 
+                          className={`relative w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white mr-3 shadow-sm`}
+                        >
+                          <span className="text-sm font-medium">{friend.displayName?.[0] || friend.username?.[0] || '?'}</span>
+                          {selectedFriends.includes(friend.uid) && (
+                            <div className="absolute -right-1 -bottom-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-800">
+                              <Check className="w-3 h-3 text-white" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className={`font-medium ${colorScheme.text} truncate`}>{friend.displayName}</h4>
+                          <p className={`text-xs ${colorScheme.textSecondary} truncate`}>@{friend.username}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 bg-gray-100 dark:bg-gray-800 rounded-xl">
+                    <div className="mb-3">
+                      <Users className="w-10 h-10 text-gray-400 mx-auto" />
+                    </div>
+                    <p className={`${colorScheme.text} font-medium mb-1`}>No friends found</p>
+                    <p className={`text-sm ${colorScheme.textSecondary} mb-4`}>
+                      Add friends to share movie recommendations
+                    </p>
+                    <button 
+                      className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-full text-sm font-medium transition-colors"
                       onClick={() => {
-                        if (selectedFriends.includes(friend.id)) {
-                          setSelectedFriends(selectedFriends.filter(id => id !== friend.id));
-                        } else {
-                          setSelectedFriends([...selectedFriends, friend.id]);
-                        }
+                        setShowRecommendModal(false);
+                        // In a real app, navigate to friend search
                       }}
                     >
-                      <div 
-                        className={`relative w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white mr-3 shadow-sm`}
-                      >
-                        <span className="text-sm font-medium">{friend.avatar}</span>
-                        {selectedFriends.includes(friend.id) && (
-                          <div className="absolute -right-1 -bottom-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-800">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-3 h-3 text-white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="20 6 9 17 4 12"></polyline>
-                            </svg>
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className={`font-medium ${colorScheme.text} truncate`}>{friend.name}</div>
-                        <div className={`text-xs ${colorScheme.textSecondary} truncate`}>@{friend.username}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                      Find Friends
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Action buttons */}
@@ -205,19 +271,16 @@ const RecommendMovieModal = ({
                 </button>
                 <button 
                   className={`px-5 py-2.5 rounded-xl font-medium shadow-sm transition-all flex items-center ${
-                    selectedFriends.length > 0
+                    selectedFriends.length > 0 && !isSubmitting
                       ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:shadow-md'
                       : 'bg-gray-200 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
                   }`}
-                  onClick={selectedFriends.length > 0 ? handleSubmit : undefined}
-                  disabled={selectedFriends.length === 0 || submitting}
+                  onClick={selectedFriends.length > 0 && !isSubmitting ? handleRecommendMovie : undefined}
+                  disabled={selectedFriends.length === 0 || isSubmitting}
                 >
-                  {submitting ? (
+                  {isSubmitting ? (
                     <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
+                      <Loader className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" />
                       Sending...
                     </>
                   ) : (

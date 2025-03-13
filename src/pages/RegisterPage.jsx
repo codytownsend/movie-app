@@ -2,16 +2,59 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useAppContext } from '../context/AppContext';
+import { Check, X, Loader } from 'lucide-react';
 
 const RegisterPage = ({ switchToLogin }) => {
   const { register, error, isAuthenticating } = useAuth();
-  const { colorScheme } = useAppContext();
+  const { colorScheme, showToast } = useAppContext();
   
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [localError, setLocalError] = useState('');
+  const [checkingUsername, setCheckingUsername] = useState(false);
+  const [usernameAvailable, setUsernameAvailable] = useState(false);
+  const [usernameChecked, setUsernameChecked] = useState(false);
+  
+  // Check username availability after user stops typing
+  const checkUsername = async (username) => {
+    if (username.length < 3) {
+      setUsernameChecked(false);
+      return;
+    }
+    
+    setCheckingUsername(true);
+    setUsernameChecked(false);
+    
+    try {
+      // This function will be implemented in firebase.js
+      const isAvailable = await checkUsernameAvailability(username);
+      setUsernameAvailable(isAvailable);
+      setUsernameChecked(true);
+    } catch (err) {
+      console.error('Error checking username:', err);
+    } finally {
+      setCheckingUsername(false);
+    }
+  };
+  
+  // Debounce username input to avoid too many database calls
+  const handleUsernameChange = (e) => {
+    const newUsername = e.target.value;
+    setUsername(newUsername);
+    
+    // Clear timeout if it exists
+    if (window.usernameTimeout) {
+      clearTimeout(window.usernameTimeout);
+    }
+    
+    // Set new timeout
+    window.usernameTimeout = setTimeout(() => {
+      checkUsername(newUsername);
+    }, 500);
+  };
   
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -28,8 +71,28 @@ const RegisterPage = ({ switchToLogin }) => {
       return;
     }
     
+    if (!username.trim()) {
+      setLocalError('Username is required');
+      return;
+    }
+    
+    if (username.length < 3) {
+      setLocalError('Username must be at least 3 characters');
+      return;
+    }
+    
+    if (!usernameAvailable && usernameChecked) {
+      setLocalError('Username is already taken');
+      return;
+    }
+    
     if (!password.trim()) {
       setLocalError('Password is required');
+      return;
+    }
+    
+    if (password.length < 6) {
+      setLocalError('Password must be at least 6 characters');
       return;
     }
     
@@ -39,7 +102,8 @@ const RegisterPage = ({ switchToLogin }) => {
     }
     
     try {
-      await register(name, email, password);
+      await register(name, email, password, username);
+      showToast('Account created successfully!');
     } catch (err) {
       setLocalError(err.message);
     }
@@ -95,6 +159,47 @@ const RegisterPage = ({ switchToLogin }) => {
               </div>
             </div>
             
+            {/* Username Field */}
+            <div>
+              <label htmlFor="username" className={`block text-sm font-medium ${colorScheme.text}`}>
+                Username <span className="text-xs text-gray-500">(for easy searching)</span>
+              </label>
+              <div className="mt-1 relative">
+                <input
+                  id="username"
+                  name="username"
+                  type="text"
+                  autoComplete="username"
+                  required
+                  value={username}
+                  onChange={handleUsernameChange}
+                  className={`appearance-none block w-full px-3 py-2 border ${usernameChecked ? (usernameAvailable ? 'border-green-500' : 'border-red-500') : colorScheme.border} rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm ${colorScheme.bg} ${colorScheme.text}`}
+                  placeholder="Choose a unique username"
+                />
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                  {checkingUsername && (
+                    <Loader className="w-4 h-4 text-gray-400 animate-spin" />
+                  )}
+                  {!checkingUsername && usernameChecked && usernameAvailable && (
+                    <Check className="w-4 h-4 text-green-500" />
+                  )}
+                  {!checkingUsername && usernameChecked && !usernameAvailable && (
+                    <X className="w-4 h-4 text-red-500" />
+                  )}
+                </div>
+              </div>
+              {usernameChecked && !usernameAvailable && (
+                <p className="mt-1 text-xs text-red-500">
+                  This username is already taken
+                </p>
+              )}
+              {username && username.length < 3 && (
+                <p className="mt-1 text-xs text-red-500">
+                  Username must be at least 3 characters
+                </p>
+              )}
+            </div>
+            
             {/* Email Field */}
             <div>
               <label htmlFor="email" className={`block text-sm font-medium ${colorScheme.text}`}>
@@ -130,6 +235,11 @@ const RegisterPage = ({ switchToLogin }) => {
                   onChange={(e) => setPassword(e.target.value)}
                   className={`appearance-none block w-full px-3 py-2 border ${colorScheme.border} rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm ${colorScheme.bg} ${colorScheme.text}`}
                 />
+                {password && password.length < 6 && (
+                  <p className="mt-1 text-xs text-red-500">
+                    Password must be at least 6 characters
+                  </p>
+                )}
               </div>
             </div>
             
@@ -149,6 +259,11 @@ const RegisterPage = ({ switchToLogin }) => {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   className={`appearance-none block w-full px-3 py-2 border ${colorScheme.border} rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm ${colorScheme.bg} ${colorScheme.text}`}
                 />
+                {confirmPassword && password !== confirmPassword && (
+                  <p className="mt-1 text-xs text-red-500">
+                    Passwords do not match
+                  </p>
+                )}
               </div>
             </div>
             
@@ -161,7 +276,14 @@ const RegisterPage = ({ switchToLogin }) => {
                   isAuthenticating ? 'opacity-70 cursor-not-allowed' : ''
                 }`}
               >
-                {isAuthenticating ? 'Creating account...' : 'Create account'}
+                {isAuthenticating ? (
+                  <>
+                    <Loader className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" />
+                    Creating account...
+                  </>
+                ) : (
+                  'Create account'
+                )}
               </button>
             </div>
           </form>
